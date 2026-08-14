@@ -35,15 +35,15 @@ function Sidebar() {
           Rooms
         </NavLink>
 
-        <a className="nav-item">
-          <span>🔌</span>
-          Devices
-        </a>
-
-        <a className="nav-item">
+        <NavLink
+            to="/alerts"
+            className={({ isActive }) =>
+            `nav-item ${isActive ? "active" : ""}`
+          }
+        >
           <span>🚨</span>
-          Alerts
-        </a>
+            Alerts
+        </NavLink>
 
         <a className="nav-item">
           <span>📊</span>

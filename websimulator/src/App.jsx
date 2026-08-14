@@ -3,6 +3,7 @@ import{ BrowserRouter, Routes, Route, Navigate, } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Rooms from "./pages/Rooms"
 import RoomDetails from "./pages/RoomDetails";
+import Alerts from "./pages/Alerts";
 function App() {
   return (
     <BrowserRouter>
@@ -26,6 +27,11 @@ function App() {
           element={<RoomDetails />}
       />
 
+      <Route 
+          path="/alerts"
+          element={<Alerts />}
+      />
+      
     </Routes>
     </BrowserRouter>
   );

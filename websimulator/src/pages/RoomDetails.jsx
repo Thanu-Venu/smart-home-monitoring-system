@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { rooms, devices } from "../data/dummyData";
 
@@ -17,6 +18,21 @@ function RoomDetails() {
     (device) => device.roomId === roomId
   );
 
+  const [deviceStates, setDeviceStates] = useState(
+    Object.fromEntries(
+        roomDevices.map((device) => [
+            device.id, device.status,
+        ])
+    )
+  );
+
+  const toggleDevice = (deviceId) => {
+        setDeviceStates((previousStates) => ({
+          ...previousStates,
+        [deviceId]: !previousStates[deviceId],
+    }));
+  };
+
   if (!room) {
     return (
       <div>
@@ -30,7 +46,7 @@ function RoomDetails() {
   }
 
   const activeDevices = roomDevices.filter(
-    (device) => device.status
+    (device) => deviceStates[device.id]
   ).length;
 
   return (
@@ -134,12 +150,12 @@ function RoomDetails() {
 
                       <span
                         className={
-                          device.status
+                          deviceStates[device.id]
                             ? "status-badge on"
                             : "status-badge off"
                         }
                       >
-                        {device.status ? "ON" : "OFF"}
+                        {deviceStates[device.id] ? "ON" : "OFF"}
                       </span>
 
                     </div>
@@ -152,12 +168,13 @@ function RoomDetails() {
 
                     <button
                       className={
-                        device.status
+                        deviceStates[device.id]
                           ? "device-control off-button"
                           : "device-control on-button"
                       }
+                      onClick={() => toggleDevice(device.id)}
                     >
-                      {device.status
+                      {deviceStates[device.id]
                         ? "Turn OFF"
                         : "Turn ON"}
                     </button>
