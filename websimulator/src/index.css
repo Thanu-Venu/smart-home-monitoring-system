@@ -325,6 +325,14 @@ a {
   font-size: 20px;
 }
 
+.room-card {
+  cursor: pointer;
+}
+
+.room-card:hover {
+  transform: translateY(-2px);
+}
+
 .room-card h3 {
   font-size: 14px;
 }
@@ -439,6 +447,13 @@ a {
   .dashboard-content {
     padding: 20px;
   }
+}
+
+.floor-home-name {
+  font-size: 13px;
+  color: #8a96a8;
+  margin-top: -4px;
+  margin-bottom: 8px;
 }
 
 /* Rooms Page */
@@ -757,4 +772,42 @@ a {
 .no-alerts p {
   color: #9ca3af;
   font-size: 12px;
+}
+
+.report-table-wrapper {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow-x: auto;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-table th,
+.report-table td {
+  padding: 15px 18px;
+  text-align: left;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+}
+
+.report-table th {
+  color: #6b7280;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.report-table td {
+  color: #374151;
+}
+
+.report-table tr:last-child td {
+  border-bottom: none;
+}
+
+.report-online {
+  font-weight: 600;
 }
