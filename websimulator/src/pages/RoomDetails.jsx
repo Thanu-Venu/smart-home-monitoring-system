@@ -19,6 +19,7 @@ function RoomDetails() {
   const [roomDevices, setRoomDevices] = useState([]);
   const [homeName, setHomeName] = useState("My Home");
   const [loading, setLoading] = useState(true);
+  const [selectedCamera, setSelectedCamera] = useState(null);
 
 
   // Listen to all Firebase homes
@@ -478,7 +479,7 @@ function RoomDetails() {
 
 
                         {/* Device Control */}
-
+                        
                         <button
                           className={
                             isOn
@@ -499,6 +500,14 @@ function RoomDetails() {
                             : "Turn ON"}
 
                         </button>
+                        {device.type === "CAMERA" && isOn && (
+                          <button
+                            className="view-camera-button"
+                            onClick={() => setSelectedCamera(device)}
+                          >
+                            📷 View Camera
+                          </button>
+                        )}
 
                       </div>
                     );
@@ -513,7 +522,43 @@ function RoomDetails() {
           </section>
 
         </section>
+      
+      {selectedCamera && (
+        <div className="camera-modal-overlay">
 
+          <div className="camera-modal">
+
+            <div className="camera-modal-header">
+              <h2>📷 {selectedCamera.name}</h2>
+
+              <button
+                className="camera-close-button"
+                onClick={() => setSelectedCamera(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="camera-video-container">
+
+              <video
+                src={selectedCamera.url}
+                autoPlay
+                controls
+                muted
+                loop
+              />
+
+            </div>
+
+            <p className="camera-status">
+              🟢 Camera is LIVE
+            </p>
+
+          </div>
+
+        </div>
+      )}
       </main>
 
     </div>

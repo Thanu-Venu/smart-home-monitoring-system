@@ -811,3 +811,69 @@ a {
 .report-online {
   font-weight: 600;
 }
+
+.view-camera-button {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+}
+
+.view-camera-button:hover {
+  opacity: 0.9;
+}
+
+.camera-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.camera-modal {
+  width: min(850px, 90%);
+  background: white;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.camera-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.camera-close-button {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.camera-video-container {
+  width: 100%;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.camera-video-container video {
+  display: block;
+  width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+}
+
+.camera-status {
+  margin-top: 10px;
+  font-weight: 600;
+}
