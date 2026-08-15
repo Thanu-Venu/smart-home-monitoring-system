@@ -26,29 +26,35 @@ function Sidebar() {
         </NavLink>
 
         <NavLink
-          to="/rooms"
-          className={({ isActive }) =>
+            to="/floors"
+            className={({ isActive }) =>
+                `nav-item ${isActive ? "active" : ""}`
+            }
+        >
+            <span>🏢</span>
+                Floors
+        </NavLink>
+
+        <NavLink
+            to="/alerts"
+            className={({ isActive }) =>
             `nav-item ${isActive ? "active" : ""}`
           }
         >
-          <span>🏠</span>
-          Rooms
+          <span>🚨</span>
+            Alerts
         </NavLink>
 
-        <a className="nav-item">
-          <span>🔌</span>
-          Devices
-        </a>
-
-        <a className="nav-item">
-          <span>🚨</span>
-          Alerts
-        </a>
-
-        <a className="nav-item">
+        <NavLink
+            to="/reports"
+            className={({ isActive }) =>
+                `nav-item ${isActive ? "active" : ""}`
+            }
+        >
           <span>📊</span>
-          Reports
-        </a>
+            Reports
+        </NavLink>
+
       </nav>
 
       <div className="sidebar-bottom">
