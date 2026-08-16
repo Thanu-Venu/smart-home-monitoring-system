@@ -1,5 +1,6 @@
-import { ref, onValue, update, } from "firebase/database";
+import { ref, onValue, update } from "firebase/database";
 import { db } from "../firebase/firebaseConfig";
+
 
 
 export const listenToHomes = (callback) => {
@@ -20,10 +21,55 @@ export const updateDeviceStatus = async (
   isOn
 ) => {
 
-  const devicePath = `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}`;
+  const devicePath =
+    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}`;
 
-  await update(ref(db, devicePath), {
+  const updates = {
     on: isOn,
     status: isOn ? "ON" : "OFF",
-  });
+  };
+
+  if (isOn) {
+
+    updates.condition = "NORMAL";
+
+    // Store the time when iron/device was turned ON
+    updates.turnedOnAt = Date.now();
+
+  } else {
+
+    updates.condition = "NORMAL";
+
+    updates.turnedOnAt = null;
+
+  }
+
+  await update(
+    ref(db, devicePath),
+    updates
+  );
+};
+
+// Update an individual switch inside a multi-switch board
+export const updateMultiSwitch = async (
+  homeId,
+  floorId,
+  roomId,
+  deviceId,
+  switchId,
+  isOn
+) => {
+
+  const switchPath =
+    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}/switches/${switchId}`;
+
+  const updates = {
+    on: isOn,
+    status: isOn ? "ON" : "OFF",
+  };
+
+  await update(
+    ref(db, switchPath),
+    updates
+  );
 };

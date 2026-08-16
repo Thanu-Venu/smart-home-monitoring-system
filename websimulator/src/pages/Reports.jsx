@@ -45,22 +45,57 @@ function Reports() {
                   const roomDevices = Object.entries(
                     room.devices || {}
                   ).map(
-                    ([deviceId, device]) => ({
-                      id: deviceId,
-                      ...device,
+                    ([deviceId, device]) => {
 
-                      homeId,
-                      homeName:
-                        home.name || "My Home",
+                      const deviceData = {
+                        id: deviceId,
+                        ...device,
 
-                      floorId,
-                      floorName:
-                        floor.name || "Unnamed Floor",
+                        homeId,
+                        homeName:
+                          home.name || "My Home",
 
-                      roomId,
-                      roomName:
-                        room.name || "Unnamed Room",
-                    })
+                        floorId,
+                        floorName:
+                          floor.name || "Unnamed Floor",
+
+                        roomId,
+                        roomName:
+                          room.name || "Unnamed Room",
+                      };
+
+                      // Multi-switch information
+                      if (device.type === "MULTI_SWITCH") {
+
+                        const switches = Object.entries(
+                          device.switches || {}
+                        ).map(
+                          ([switchId, switchData]) => ({
+                            id: switchId,
+                            name:
+                              switchData.name ||
+                              `Switch ${switchId}`,
+                            on: switchData.on === true,
+                          })
+                        );
+
+                        deviceData.switches = switches;
+
+                        deviceData.totalSwitches =
+                          switches.length;
+
+                        deviceData.activeSwitches =
+                          switches.filter(
+                            (switchItem) => switchItem.on
+                          ).length;
+
+                        deviceData.inactiveSwitches =
+                          switches.length -
+                          deviceData.activeSwitches;
+                      }
+
+                      return deviceData;
+                    }
                   );
 
                   const activeDevices =
@@ -468,6 +503,7 @@ function Reports() {
                         Status
                       </th>
 
+
                     </tr>
 
                   </thead>
@@ -475,7 +511,11 @@ function Reports() {
 
                   <tbody>
 
-                    {devices.map(
+                    {devices
+                      .filter(
+                        (device) => device.type !== "MULTI_SWITCH"
+                      )
+                      .map(
                       (device) => {
 
                         const isOn =
@@ -525,11 +565,171 @@ function Reports() {
                               </span>
 
                             </td>
-
+                            
                           </tr>
                         );
                       }
                     )}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            )}
+
+          </section>
+
+          {/* Multi-Switch Status */}
+
+          <section className="section">
+
+            <div className="section-header">
+
+              <div>
+
+                <h2>
+                  Multi-Switch Status
+                </h2>
+
+                <p>
+                  Current status of each switch
+                  in your multi-switch boards.
+                </p>
+
+              </div>
+
+            </div>
+
+
+            {devices.filter(
+              (device) =>
+                device.type === "MULTI_SWITCH"
+            ).length === 0 ? (
+
+              <div className="empty-state">
+
+                <div>
+                  🔀
+                </div>
+
+                <h3>
+                  No multi-switch boards
+                </h3>
+
+                <p>
+                  No multi-switch devices are
+                  available.
+                </p>
+
+              </div>
+
+            ) : (
+
+              <div className="report-table-wrapper">
+
+                <table className="report-table">
+
+                  <thead>
+
+                    <tr>
+
+                      <th>
+                        Board
+                      </th>
+
+                      <th>
+                        Home
+                      </th>
+
+                      <th>
+                        Floor
+                      </th>
+
+                      <th>
+                        Room
+                      </th>
+
+                      <th>
+                        Switch
+                      </th>
+
+                      <th>
+                        Status
+                      </th>
+
+                    </tr>
+
+                  </thead>
+
+
+                  <tbody>
+
+                    {devices
+                      .filter(
+                        (device) =>
+                          device.type === "MULTI_SWITCH"
+                      )
+                      .flatMap(
+                        (device) =>
+
+                          device.switches?.map(
+                            (switchItem) => (
+
+                              <tr
+                                key={`${device.id}-${switchItem.id}`}
+                              >
+
+                                <td>
+
+                                  <strong>
+                                    {device.name}
+                                  </strong>
+
+                                </td>
+
+                                <td>
+                                  {device.homeName}
+                                </td>
+
+                                <td>
+                                  {device.floorName}
+                                </td>
+
+                                <td>
+                                  {device.roomName}
+                                </td>
+
+                                <td>
+
+                                  <strong>
+                                    {switchItem.name}
+                                  </strong>
+
+                                </td>
+
+                                <td>
+
+                                  <span
+                                    className={
+                                      switchItem.on
+                                        ? "status-badge on"
+                                        : "status-badge off"
+                                    }
+                                  >
+                                    {switchItem.on
+                                      ? "ON"
+                                      : "OFF"}
+                                  </span>
+
+                                </td>
+
+                              </tr>
+
+                            )
+                          ) || []
+                      )}
 
                   </tbody>
 
