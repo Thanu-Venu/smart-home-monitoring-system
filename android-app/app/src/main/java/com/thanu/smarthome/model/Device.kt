@@ -18,6 +18,16 @@ data class Device(
     // Safety-critical device support
     var maxOnDurationMinutes: Int = 0,
 
+    // Epoch millis timestamp of when the device was last switched ON.
+    // Used by SafetyMonitor to enforce maxOnDurationMinutes.
+    var turnedOnAt: Long = 0,
+
+    // Safety condition surfaced by the safety cutoff worker: "NORMAL" or "CRITICAL".
+    var condition: String = "NORMAL",
+
+    // Human-readable message set when a device is auto-switched off for safety.
+    var alert: String = "",
+
     // Automatic scheduling
     var scheduleEnabled: Boolean = false,
     var scheduleStart: String = "",

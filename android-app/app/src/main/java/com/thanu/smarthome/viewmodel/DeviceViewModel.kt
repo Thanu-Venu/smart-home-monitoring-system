@@ -1,6 +1,7 @@
 package com.thanu.smarthome.viewmodel
 
 import androidx.lifecycle.ViewModel
+import com.google.firebase.database.ValueEventListener
 import com.thanu.smarthome.model.Device
 import com.thanu.smarthome.model.DeviceUiState
 import com.thanu.smarthome.repository.DeviceRepository
@@ -17,6 +18,109 @@ class DeviceViewModel : ViewModel() {
 
     val uiState: StateFlow<DeviceUiState> =
         _uiState.asStateFlow()
+
+    /*
+     * Live device listener bookkeeping, so we can detach it
+     * (removeDevicesListener) once this ViewModel is cleared.
+     */
+    private var devicesListener: ValueEventListener? = null
+    private var listeningHomeId: String? = null
+    private var listeningFloorId: String? = null
+    private var listeningRoomId: String? = null
+
+
+    /*
+     * START LISTENING (REAL-TIME)
+     *
+     * Replaces the one-off getDevices() fetch for screens that need
+     * to stay in sync automatically, e.g. DeviceScreen.
+     */
+    fun startListening(
+        homeId: String,
+        floorId: String,
+        roomId: String
+    ) {
+
+        if (
+            devicesListener != null &&
+            listeningHomeId == homeId &&
+            listeningFloorId == floorId &&
+            listeningRoomId == roomId
+        ) {
+            // Already listening to this exact room, nothing to do.
+            return
+        }
+
+        stopListening()
+
+        _uiState.value = _uiState.value.copy(
+            isLoading = true,
+            message = null,
+            errorMessage = null
+        )
+
+        listeningHomeId = homeId
+        listeningFloorId = floorId
+        listeningRoomId = roomId
+
+        devicesListener = repository.observeDevices(
+            homeId = homeId,
+            floorId = floorId,
+            roomId = roomId,
+
+            onDevices = { devices ->
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    devices = devices,
+                    errorMessage = null
+                )
+            },
+
+            onError = { message ->
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = message
+                )
+            }
+        )
+    }
+
+
+    /*
+     * STOP LISTENING
+     */
+    fun stopListening() {
+
+        val listener = devicesListener
+        val homeId = listeningHomeId
+        val floorId = listeningFloorId
+        val roomId = listeningRoomId
+
+        if (
+            listener != null &&
+            homeId != null &&
+            floorId != null &&
+            roomId != null
+        ) {
+
+            repository.removeDevicesListener(
+                homeId = homeId,
+                floorId = floorId,
+                roomId = roomId,
+                listener = listener
+            )
+        }
+
+        devicesListener = null
+    }
+
+
+    override fun onCleared() {
+        super.onCleared()
+        stopListening()
+    }
 
 
     /*
@@ -227,13 +331,31 @@ class DeviceViewModel : ViewModel() {
         device: Device
     ) {
 
+        val turningOn = !device.on
+
         val updatedDevice = device.copy(
-            on = !device.on,
-            status = if (!device.on) {
+            on = turningOn,
+            status = if (turningOn) {
                 "ON"
             } else {
                 "OFF"
-            }
+            },
+
+            /*
+             * SAFETY CUTOFF TRACKING
+             *
+             * Stamp the moment a duration-limited device (e.g. iron) is
+             * switched ON so SafetyMonitor can enforce maxOnDurationMinutes.
+             * Manually switching a device OFF/ON also clears any previous
+             * CRITICAL alert, since the user has taken control of it again.
+             */
+            turnedOnAt = if (turningOn) {
+                System.currentTimeMillis()
+            } else {
+                0L
+            },
+            condition = "NORMAL",
+            alert = ""
         )
 
         updateDevice(

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,15 +38,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.thanu.smarthome.model.Home
+import com.thanu.smarthome.repository.AuthRepository
 import com.thanu.smarthome.viewmodel.HomeViewModel
 
 @Composable
 fun HomeScreen(
     onOpenFloors: (String) -> Unit,
+    onLogout: () -> Unit,
     homeViewModel: HomeViewModel = viewModel()
 ) {
 
     val uiState by homeViewModel.uiState.collectAsState()
+
+    /*
+     * Homes are now scoped to the signed-in user instead of a
+     * hardcoded "user001" placeholder.
+     */
+    val authRepository = remember {
+        AuthRepository()
+    }
+
+    val currentUserId = authRepository.currentUserId
 
 
     var homeName by remember {
@@ -71,8 +84,8 @@ fun HomeScreen(
     /*
      * LOAD HOMES
      */
-    LaunchedEffect(Unit) {
-        homeViewModel.getHomes("user001")
+    LaunchedEffect(currentUserId) {
+        homeViewModel.getHomes(currentUserId)
     }
 
     LazyColumn(
@@ -105,17 +118,36 @@ fun HomeScreen(
                     )
                 }
 
-                IconButton(
-                    onClick = {
-                        showCreateDialog = true
-                    }
-                ) {
+                Row {
 
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Create Home",
-                        modifier = Modifier.size(28.dp)
-                    )
+                    IconButton(
+                        onClick = {
+                            showCreateDialog = true
+                        }
+                    ) {
+
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Create Home",
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+
+                            authRepository.signOut()
+
+                            onLogout()
+                        }
+                    ) {
+
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "Logout",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 
@@ -339,7 +371,7 @@ fun HomeScreen(
 
                             homeViewModel.createHome(
                                 name = homeName.trim(),
-                                ownerId = "user001"
+                                ownerId = currentUserId
                             )
 
                             homeName = ""
