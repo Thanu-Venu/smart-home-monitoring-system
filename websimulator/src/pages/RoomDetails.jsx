@@ -673,7 +673,7 @@ function RoomDetails() {
                                     >
                                       {switchIsOn ? "TURN OFF" : "TURN ON"}
                                     </button>
-                                            {/* Switch Schedule */}
+                                          
                                     {/* Switch Schedule */}
                                     <div className="multi-switch-schedule">
 
