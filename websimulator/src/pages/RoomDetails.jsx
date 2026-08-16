@@ -9,6 +9,8 @@ import {
   listenToHomes,
   updateDeviceStatus,
   updateMultiSwitch,
+  updateDeviceSchedule,
+  updateMultiSwitchSchedule,
 } from "../services/homeService";
 
 const getDeviceCondition = (device) => {
@@ -254,6 +256,68 @@ function RoomDetails() {
     }
   };
 
+  const updateSchedule = async (
+    deviceId,
+    enabled,
+    startTime,
+    endTime
+  ) => {
+    if (!homeId || !floorId || !roomId) {
+      return;
+    }
+
+    try {
+      await updateDeviceSchedule(
+        homeId,
+        floorId,
+        roomId,
+        deviceId,
+        enabled,
+        startTime,
+        endTime
+      );
+    } catch (error) {
+      console.error(
+        "Failed to update schedule:",
+        error
+      );
+    }
+  };
+
+  const updateSwitchSchedule = async (
+  deviceId,
+  switchId,
+  enabled,
+  startTime,
+  endTime
+) => {
+
+  if (!homeId || !floorId || !roomId) {
+    return;
+  }
+
+  try {
+
+    await updateMultiSwitchSchedule(
+      homeId,
+      floorId,
+      roomId,
+      deviceId,
+      switchId,
+      enabled,
+      startTime,
+      endTime
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Failed to update multi-switch schedule:",
+      error
+    );
+
+  }
+};
 
   // Loading state
   if (loading) {
@@ -609,6 +673,97 @@ function RoomDetails() {
                                     >
                                       {switchIsOn ? "TURN OFF" : "TURN ON"}
                                     </button>
+                                          
+                                    {/* Switch Schedule */}
+                                    <div className="multi-switch-schedule">
+
+                                    <div className="multi-switch-schedule-header">
+
+                                      <div>
+                                        <strong>🕒 Schedule</strong>
+
+                                        <span>
+                                          Automatic ON/OFF
+                                        </span>
+                                      </div>
+
+                                      <label className="schedule-toggle">
+
+                                        <input
+                                          type="checkbox"
+                                          checked={switchData.scheduleEnabled === true}
+                                          onChange={(e) =>
+                                            updateSwitchSchedule(
+                                              device.id,
+                                              switchId,
+                                              e.target.checked,
+                                              switchData.scheduleStart || "",
+                                              switchData.scheduleEnd || ""
+                                            )
+                                          }
+                                        />
+
+                                        <span className="schedule-slider"></span>
+
+                                      </label>
+
+                                    </div>
+
+
+                                    {switchData.scheduleEnabled === true && (
+
+                                      <div className="schedule-times">
+
+                                        <div className="schedule-time">
+
+                                          <label>
+                                            ON Time
+                                          </label>
+
+                                          <input
+                                            type="time"
+                                            value={switchData.scheduleStart || ""}
+                                            onChange={(e) =>
+                                              updateSwitchSchedule(
+                                                device.id,
+                                                switchId,
+                                                true,
+                                                e.target.value,
+                                                switchData.scheduleEnd || ""
+                                              )
+                                            }
+                                          />
+
+                                        </div>
+
+
+                                        <div className="schedule-time">
+
+                                          <label>
+                                            OFF Time
+                                          </label>
+
+                                          <input
+                                            type="time"
+                                            value={switchData.scheduleEnd || ""}
+                                            onChange={(e) =>
+                                              updateSwitchSchedule(
+                                                device.id,
+                                                switchId,
+                                                true,
+                                                switchData.scheduleStart || "",
+                                                e.target.value
+                                              )
+                                            }
+                                          />
+
+                                        </div>
+
+                                      </div>
+
+                                    )}
+
+                                    </div>
 
                                   </div>
                                 );
@@ -618,21 +773,101 @@ function RoomDetails() {
                           </div>
                         )}
 
-                        {/* Schedule */}
 
-                        {device.scheduleEnabled && (
+                        {/* Schedule - Light and Fan only */}
 
-                          <p className="device-schedule">
+                        {(device.type === "LIGHT" ||
+                          device.type === "FAN") && (
+                            
 
-                            Schedule:{" "}
+                          <div className="multi-switch-schedule">
 
-                            {device.scheduleStart}
+                            <div className="multi-switch-schedule-header">
 
-                            {" - "}
+                              <div>
+                                <strong>
+                                  🕒 Schedule
+                                </strong>
 
-                            {device.scheduleEnd}
+                                <span>
+                                  Automatic ON/OFF
+                                </span>
+                              </div>
 
-                          </p>
+                              <label className="schedule-toggle">
+
+                                <input
+                                  type="checkbox"
+                                  checked={device.scheduleEnabled === true}
+                                  onChange={(e) =>
+                                    updateSchedule(
+                                      device.id,
+                                      e.target.checked,
+                                      device.scheduleStart || "",
+                                      device.scheduleEnd || ""
+                                    )
+                                  }
+                                />
+
+                                <span className="schedule-slider"></span>
+
+                              </label>
+
+                            </div>
+
+
+                            {device.scheduleEnabled === true && (
+
+                              <div className="schedule-times">
+
+                                <div className="schedule-time">
+
+                                  <label>
+                                    ON Time
+                                  </label>
+
+                                  <input
+                                    type="time"
+                                    value={device.scheduleStart || ""}
+                                    onChange={(e) =>
+                                      updateSchedule(
+                                        device.id,
+                                        true,
+                                        e.target.value,
+                                        device.scheduleEnd || ""
+                                      )
+                                    }
+                                  />
+
+                                </div>
+
+
+                                <div className="schedule-time">
+
+                                  <label>
+                                    OFF Time
+                                  </label>
+
+                                  <input
+                                    type="time"
+                                    value={device.scheduleEnd || ""}
+                                    onChange={(e) =>
+                                      updateSchedule(
+                                        device.id,
+                                        true,
+                                        device.scheduleStart || "",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+
+                                </div>
+
+                              </div>
+
+                            )}
+
+                          </div>
 
                         )}
 

@@ -899,42 +899,40 @@ a {
   color: #dc2626;
 }
 
-/* ================================
-   Multi-Switch
-================================ */
+/* =========================================
+   MULTI-SWITCH BOARD
+   ========================================= */
 
 .multi-switch-container {
-  margin-top: 16px;
+  margin-top: 18px;
   padding: 14px;
-  background: #f3f4f6;
+  background: #f8fafc;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
+  display: flex;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 }
 
 .multi-switch-container h4 {
-  margin: 0 0 12px;
-  color: #1f2937;
   font-size: 13px;
-  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
 }
-
 
 /* Individual switch row */
 
 .multi-switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid #e5e7eb;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
 }
 
 .multi-switch-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+  margin-bottom: 0;
 }
-
 
 /* Switch information */
 
@@ -942,70 +940,60 @@ a {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 0;
+  margin-bottom: 10px;
 }
 
 .multi-switch-icon {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 9px;
-  background: white;
-  border: 1px solid #e5e7eb;
-
+  background: #eff6ff;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  font-size: 16px;
-}
-
-.multi-switch-info > div {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  font-size: 17px;
+  flex-shrink: 0;
 }
 
 .multi-switch-info strong {
-  color: #1f2937;
+  display: block;
   font-size: 12px;
-  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
 }
 
-
-/* Switch status */
+/* Switch ON/OFF status */
 
 .multi-switch-status {
-  font-size: 10px;
-  font-weight: 600;
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 10px;
 }
 
 .multi-switch-status.on {
-  color: #16a34a;
+  background: #dcfce7;
+  color: #15803d;
 }
 
 .multi-switch-status.off {
-  color: #9ca3af;
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
-
-/* Switch button */
+/* Switch ON/OFF button */
 
 .multi-switch-button {
-  min-width: 48px;
-  padding: 6px 10px;
-
+  width: 100%;
   border: none;
   border-radius: 8px;
-
+  padding: 8px;
   font-size: 10px;
-  font-weight: 600;
-
+  font-weight: 700;
   cursor: pointer;
-  transition: 0.2s;
+  transition: all 0.2s ease;
 }
-
-
-/* ON */
 
 .multi-switch-button.on {
   background: #2563eb;
@@ -1016,9 +1004,6 @@ a {
   background: #1d4ed8;
 }
 
-
-/* OFF */
-
 .multi-switch-button.off {
   background: #fee2e2;
   color: #dc2626;
@@ -1026,4 +1011,142 @@ a {
 
 .multi-switch-button.off:hover {
   background: #fecaca;
+}
+
+
+/* =========================================
+   MULTI-SWITCH SCHEDULE
+   ========================================= */
+
+.multi-switch-schedule {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.multi-switch-schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.multi-switch-schedule-header strong {
+  display: block;
+  font-size: 11px;
+  color: #374151;
+}
+
+.multi-switch-schedule-header span {
+  display: block;
+  color: #9ca3af;
+  font-size: 9px;
+  margin-top: 3px;
+}
+
+
+/* =========================================
+   SCHEDULE TOGGLE
+   ========================================= */
+
+.schedule-toggle {
+  position: relative;
+  width: 38px;
+  height: 21px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.schedule-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.schedule-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #d1d5db;
+  border-radius: 20px;
+  transition: 0.2s;
+}
+
+.schedule-slider::before {
+  content: "";
+  position: absolute;
+  width: 17px;
+  height: 17px;
+  left: 2px;
+  top: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.schedule-toggle input:checked + .schedule-slider {
+  background: #2563eb;
+}
+
+.schedule-toggle input:checked + .schedule-slider::before {
+  transform: translateX(17px);
+}
+
+
+/* =========================================
+   SCHEDULE TIME INPUTS
+   ========================================= */
+
+.schedule-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.schedule-time {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.schedule-time label {
+  font-size: 9px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.schedule-time input {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: white;
+  color: #374151;
+  font-size: 10px;
+  outline: none;
+}
+
+.schedule-time input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+
+/* =========================================
+   MULTI-SWITCH RESPONSIVE
+   ========================================= */
+
+@media (max-width: 700px) {
+  .multi-switch-container {
+    padding: 10px;
+  }
+
+  .multi-switch-row {
+    padding: 10px;
+  }
+
+  .schedule-times {
+    grid-template-columns: 1fr;
+  }
 }
