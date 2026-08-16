@@ -1,6 +1,25 @@
-import { NavLink } from "react-router-dom";
+import { signOut } from "firebase/auth";
+import { useNavigate, NavLink } from "react-router-dom";
+
+import { auth } from "../firebase/firebaseConfig";
+
 
 function Sidebar() {
+  const navigate = useNavigate();
+
+const handleLogout = async () => {
+  try {
+    await signOut(auth);
+
+    console.log("User logged out");
+
+    navigate("/login");
+
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
+};
+
   return (
     <aside className="sidebar">
       <div className="logo">
@@ -66,6 +85,13 @@ function Sidebar() {
             <small>All systems operational</small>
           </div>
         </div>
+            <button
+                className="logout-button"
+                onClick={handleLogout}
+            >
+                <span className="logout-icon">↪</span>
+                  Logout
+            </button>
       </div>
     </aside>
   );
