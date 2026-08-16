@@ -3077,6 +3077,23 @@ fun DeviceScreen(
                     onClick = {
 
                         /*
+                         * Re-read the live device from uiState instead
+                         * of trusting the snapshot captured when the
+                         * Edit button was tapped. Background workers
+                         * (SafetyMonitor's safety cutoff, ScheduleMonitor's
+                         * schedule enforcement) can change this device's
+                         * on/status/condition/alert/switches in Firebase
+                         * while this dialog is open, and Save below does
+                         * a full node overwrite — building off the stale
+                         * snapshot would silently undo whatever they just
+                         * did. Falls back to the captured snapshot if the
+                         * device was deleted while the dialog was open.
+                         */
+                        val device =
+                            uiState.devices.find { it.id == device.id }
+                                ?: device
+
+                        /*
                          * MULTI SWITCH
                          *
                          * Resize the actual switches list to match the

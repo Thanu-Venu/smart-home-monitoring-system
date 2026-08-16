@@ -141,16 +141,25 @@ object ScheduleMonitor {
 
                         val deviceId = deviceSnapshot.key ?: continue
 
-                        // A manually-simulated fault means neither
-                        // the device's own schedule nor any of its
-                        // switches' schedules should be touched.
+                        // A manually-simulated fault means neither the
+                        // device's own schedule nor any of its switches'
+                        // schedules should actually change its on/off
+                        // state. isControllable is threaded through
+                        // instead of `continue`-ing past this device
+                        // entirely, so window tracking below still runs
+                        // for a faulted device — otherwise, the moment
+                        // it's reconnected, lastWindowState would have
+                        // no entry for it, this worker would treat it as
+                        // "first time seen," and immediately force it to
+                        // whatever the schedule window currently
+                        // dictates, overriding whatever the user just
+                        // set on reconnect.
                         val status =
                             deviceSnapshot.child("status")
                                 .getValue(String::class.java) ?: "OFF"
 
-                        if (status == "ERROR" || status == "DISCONNECTED") {
-                            continue
-                        }
+                        val isControllable =
+                            status != "ERROR" && status != "DISCONNECTED"
 
                         checkDeviceLevelSchedule(
                             homeId = homeId,
@@ -159,7 +168,8 @@ object ScheduleMonitor {
                             deviceId = deviceId,
                             deviceSnapshot = deviceSnapshot,
                             nowMinutes = nowMinutes,
-                            newWindowState = newWindowState
+                            newWindowState = newWindowState,
+                            isControllable = isControllable
                         )
 
                         // Independent of the device-level schedule
@@ -173,7 +183,8 @@ object ScheduleMonitor {
                             deviceId = deviceId,
                             deviceSnapshot = deviceSnapshot,
                             nowMinutes = nowMinutes,
-                            newWindowState = newWindowState
+                            newWindowState = newWindowState,
+                            isControllable = isControllable
                         )
                     }
                 }
@@ -191,7 +202,8 @@ object ScheduleMonitor {
         deviceId: String,
         deviceSnapshot: DataSnapshot,
         nowMinutes: Int,
-        newWindowState: MutableMap<String, Boolean>
+        newWindowState: MutableMap<String, Boolean>,
+        isControllable: Boolean
     ) {
 
         val scheduleEnabled =
@@ -236,6 +248,16 @@ object ScheduleMonitor {
         }
 
         /*
+         * A manually-simulated fault (ERROR/DISCONNECTED) means the
+         * schedule shouldn't actually touch this device's state — but
+         * newWindowState above was still recorded, so a later reconnect
+         * resumes tracking from here instead of restarting cold.
+         */
+        if (!isControllable) {
+            return
+        }
+
+        /*
          * Either this is the very first time this device has been
          * seen (app just started, or its schedule was just turned
          * on) or the window boundary was crossed since the last
@@ -270,7 +292,19 @@ object ScheduleMonitor {
         val updates: Map<String, Any> = mapOf(
             "on" to shouldBeOn,
             "status" to if (shouldBeOn) "ON" else "OFF",
-            "turnedOnAt" to if (shouldBeOn) System.currentTimeMillis() else 0L
+            "turnedOnAt" to if (shouldBeOn) System.currentTimeMillis() else 0L,
+
+            /*
+             * Same as DeviceViewModel.toggleDevice()'s manual toggle:
+             * any state change this worker makes clears a previous
+             * safety-cutoff CRITICAL alert, since the schedule taking
+             * control again means the old alert no longer applies.
+             * Without this, a device SafetyMonitor cut off would show
+             * ON with a stale CRITICAL banner once its schedule turns
+             * it back on.
+             */
+            "condition" to "NORMAL",
+            "alert" to ""
         )
 
         deviceRef.updateChildren(updates)
@@ -298,7 +332,8 @@ object ScheduleMonitor {
         deviceId: String,
         deviceSnapshot: DataSnapshot,
         nowMinutes: Int,
-        newWindowState: MutableMap<String, Boolean>
+        newWindowState: MutableMap<String, Boolean>,
+        isControllable: Boolean
     ) {
 
         val switchesSnapshot = deviceSnapshot.child("switches")
@@ -364,6 +399,13 @@ object ScheduleMonitor {
 
             if (previousShouldBeOn != null && previousShouldBeOn == shouldBeOn) {
                 // No boundary crossed — leave a manual override alone.
+                continue
+            }
+
+            // Window tracking above still ran for a faulted device;
+            // only the actual write is skipped here (see the matching
+            // comment in checkDeviceLevelSchedule).
+            if (!isControllable) {
                 continue
             }
 
