@@ -393,23 +393,35 @@ fun RoomScreen(
 
             item(span = fullWidthSpan) {
 
-                Spacer(
-                    modifier = Modifier.height(32.dp)
-                )
+                /*
+                 * Without this Column, these Spacer/Text calls are
+                 * all direct siblings inside a single grid-item slot,
+                 * which has no arrangement logic of its own — they
+                 * end up stacked on top of each other at the same
+                 * position instead of laid out top-to-bottom. That's
+                 * what caused "No rooms yet" and "Tap + to create
+                 * your first room." to visually overlap.
+                 */
+                Column {
 
-                Text(
-                    text = "No rooms yet",
-                    style =
-                        MaterialTheme.typography.titleMedium
-                )
+                    Spacer(
+                        modifier = Modifier.height(32.dp)
+                    )
 
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
+                    Text(
+                        text = "No rooms yet",
+                        style =
+                            MaterialTheme.typography.titleMedium
+                    )
 
-                Text(
-                    text = "Tap + to create your first room."
-                )
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
+                    Text(
+                        text = "Tap + to create your first room."
+                    )
+                }
             }
         }
 
@@ -619,11 +631,14 @@ fun RoomScreen(
 
             if (uiState.isLoading) {
 
-                Spacer(
-                    modifier = Modifier.height(16.dp)
-                )
+                Column {
 
-                CircularProgressIndicator()
+                    Spacer(
+                        modifier = Modifier.height(16.dp)
+                    )
+
+                    CircularProgressIndicator()
+                }
             }
         }
 
@@ -634,26 +649,29 @@ fun RoomScreen(
 
         item(span = fullWidthSpan) {
 
-            uiState.message?.let { message ->
+            Column {
 
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
+                uiState.message?.let { message ->
 
-                Text(
-                    text = message
-                )
-            }
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
 
-            uiState.errorMessage?.let { message ->
+                    Text(
+                        text = message
+                    )
+                }
 
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
+                uiState.errorMessage?.let { message ->
 
-                Text(
-                    text = "Error: $message"
-                )
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
+
+                    Text(
+                        text = "Error: $message"
+                    )
+                }
             }
         }
     }

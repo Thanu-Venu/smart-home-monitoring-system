@@ -146,7 +146,7 @@ useEffect(() => {
                 <button
                   className="view-room-button"
                   onClick={() =>
-                    navigate(`/rooms/${homeId}/${room.id}`)
+                    navigate(`/rooms/${room.homeId}/${room.id}`)
                   }
                 >
                   View Room
