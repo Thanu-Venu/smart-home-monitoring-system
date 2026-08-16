@@ -50,6 +50,32 @@ export const updateDeviceStatus = async (
   );
 };
 
+// Update Light/Fan schedule
+export const updateDeviceSchedule = async (
+  homeId,
+  floorId,
+  roomId,
+  deviceId,
+  scheduleEnabled,
+  scheduleStart,
+  scheduleEnd
+) => {
+
+  const devicePath =
+    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}`;
+
+  const updates = {
+    scheduleEnabled,
+    scheduleStart,
+    scheduleEnd,
+  };
+
+  await update(
+    ref(db, devicePath),
+    updates
+  );
+};
+
 // Update an individual switch inside a multi-switch board
 export const updateMultiSwitch = async (
   homeId,
@@ -66,6 +92,32 @@ export const updateMultiSwitch = async (
   const updates = {
     on: isOn,
     status: isOn ? "ON" : "OFF",
+  };
+
+  await update(
+    ref(db, switchPath),
+    updates
+  );
+};
+// Update schedule for an individual Multi-Switch
+export const updateMultiSwitchSchedule = async (
+  homeId,
+  floorId,
+  roomId,
+  deviceId,
+  switchId,
+  scheduleEnabled,
+  scheduleStart,
+  scheduleEnd
+) => {
+
+  const switchPath =
+    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}/switches/${switchId}`;
+
+  const updates = {
+    scheduleEnabled,
+    scheduleStart,
+    scheduleEnd,
   };
 
   await update(
