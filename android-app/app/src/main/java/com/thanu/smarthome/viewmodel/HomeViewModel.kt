@@ -38,11 +38,12 @@ class HomeViewModel : ViewModel() {
         val (query, listener) = repository.observeHomes(
             ownerId = ownerId,
 
-            onHomes = { homes ->
+            onHomes = { homes, summary ->
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     homes = homes,
+                    summary = summary,
                     errorMessage = null
                 )
             },

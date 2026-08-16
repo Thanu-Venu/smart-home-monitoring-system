@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.thanu.smarthome.model.Home
@@ -160,6 +162,53 @@ fun HomeScreen(
 
 
         /*
+         * DASHBOARD SUMMARY
+         *
+         * Totals across every home this user owns — gives the
+         * screen something to say at a glance instead of jumping
+         * straight into a plain list. Counts come from the same
+         * real-time listener that already loads the home list, so
+         * this updates live as floors/rooms/devices change anywhere.
+         */
+        item {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+
+                DashboardStatCard(
+                    label = "Floors",
+                    value = uiState.summary.floorsCount.toString(),
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+
+                DashboardStatCard(
+                    label = "Rooms",
+                    value = uiState.summary.roomsCount.toString(),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+
+                DashboardStatCard(
+                    label = "Devices",
+                    value = uiState.summary.devicesCount.toString(),
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(
+                modifier = Modifier.height(20.dp)
+            )
+        }
+
+
+        /*
          * HOME LIST
          */
         items(
@@ -170,7 +219,10 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp)
+                    .padding(vertical = 6.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
 
                 Column(
@@ -538,5 +590,53 @@ fun HomeScreen(
                 }
             }
         )
+    }
+}
+
+
+/*
+ * DASHBOARD STAT CARD
+ *
+ * A single colorful "at a glance" tile for the Home screen summary
+ * row (Floors / Rooms / Devices). Takes explicit container/content
+ * colors rather than picking its own, so each of the three cards can
+ * use a different theme role (primary/secondary/tertiary container)
+ * while still automatically adapting to light/dark mode.
+ */
+@Composable
+private fun DashboardStatCard(
+    label: String,
+    value: String,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier
+) {
+
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        )
+    ) {
+
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Spacer(
+                modifier = Modifier.height(2.dp)
+            )
+
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
     }
 }

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Weekend
 import androidx.compose.material.icons.filled.Yard
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -443,7 +444,10 @@ fun RoomScreen(
                             room.id,
                             room.name
                         )
-                    }
+                    },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
 
                 Column(

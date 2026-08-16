@@ -18,13 +18,28 @@ import kotlin.coroutines.resumeWithException
  * SCHEDULE MONITOR
  *
  * Enforces the spec's "some light bulbs may be set to turn on and
- * off automatically during a preset time period" requirement.
+ * off automatically during a preset time period" requirement — while
+ * still letting the owner manually override a schedule-controlled
+ * device from the app, which the spec's device-control requirement
+ * implies should always work regardless of what else controls a
+ * device.
  *
  * Any device with scheduleEnabled = true and a scheduleStart /
  * scheduleEnd ("HH:mm", 24-hour) is treated as schedule-controlled:
- * this worker turns it ON when the current time enters that window
- * and OFF when it leaves it, handling windows that wrap past
- * midnight (e.g. 21:00 - 05:00).
+ * this worker turns it ON the moment the current time *enters* that
+ * window and OFF the moment it *leaves* it, handling windows that
+ * wrap past midnight (e.g. 21:00 - 05:00).
+ *
+ * Importantly, this only acts at the moment a window boundary is
+ * actually crossed (edge-triggered), not on every poll. lastWindowState
+ * remembers whether each device was inside its window as of the
+ * previous check; if that hasn't changed since last time, the device
+ * is left alone no matter what its current on/off state is. That's
+ * what lets a manual toggle from the app stick between schedule
+ * boundaries — e.g. turning a light ON outside its window keeps it
+ * on until the window's own start/end time naturally reasserts
+ * control, instead of this worker fighting the user's last action
+ * every 30 seconds.
  *
  * Devices the user has manually marked ERROR/DISCONNECTED (via
  * DeviceScreen's "Simulate" menu) are left alone — a device that
@@ -51,6 +66,14 @@ object ScheduleMonitor {
     )
 
     private var isRunning = false
+
+    /*
+     * deviceId -> "was this device inside its schedule window as of
+     * the last check?". Rebuilt fresh every check cycle (see
+     * checkAllDevices), so deleted/no-longer-scheduled devices drop
+     * out on their own instead of leaking forever.
+     */
+    private var lastWindowState: Map<String, Boolean> = emptyMap()
 
 
     fun start() {
@@ -86,6 +109,12 @@ object ScheduleMonitor {
 
         val nowMinutes = currentMinuteOfDay()
 
+        /*
+         * Built fresh this cycle, then swapped into lastWindowState
+         * once everything's been checked — see the field comment.
+         */
+        val newWindowState = mutableMapOf<String, Boolean>()
+
         for (homeSnapshot in homesSnapshot.children) {
 
             val homeId = homeSnapshot.key ?: continue
@@ -108,12 +137,15 @@ object ScheduleMonitor {
                             roomId = roomId,
                             deviceId = deviceId,
                             deviceSnapshot = deviceSnapshot,
-                            nowMinutes = nowMinutes
+                            nowMinutes = nowMinutes,
+                            newWindowState = newWindowState
                         )
                     }
                 }
             }
         }
+
+        lastWindowState = newWindowState
     }
 
 
@@ -123,7 +155,8 @@ object ScheduleMonitor {
         roomId: String,
         deviceId: String,
         deviceSnapshot: DataSnapshot,
-        nowMinutes: Int
+        nowMinutes: Int,
+        newWindowState: MutableMap<String, Boolean>
     ) {
 
         val scheduleEnabled =
@@ -158,11 +191,34 @@ object ScheduleMonitor {
         val shouldBeOn =
             isWithinWindow(nowMinutes, startMinutes, endMinutes)
 
+        // Record this device's window state for the *next* cycle's
+        // comparison, regardless of what we do below.
+        newWindowState[deviceId] = shouldBeOn
+
+        val previousShouldBeOn = lastWindowState[deviceId]
+
+        if (previousShouldBeOn != null && previousShouldBeOn == shouldBeOn) {
+
+            /*
+             * Still inside the same window segment as last check —
+             * no boundary crossed, so this is exactly the gap where
+             * a manual override from the app should be respected.
+             * Leave the device's actual on/off state alone.
+             */
+            return
+        }
+
+        /*
+         * Either this is the very first time this device has been
+         * seen (app just started, or its schedule was just turned
+         * on) or the window boundary was crossed since the last
+         * check — in both cases the schedule takes control now.
+         */
         val isOn =
             deviceSnapshot.child("on").getValue(Boolean::class.java) ?: false
 
         if (shouldBeOn == isOn) {
-            // Already in the correct state, nothing to do.
+            // Already in the correct state, nothing to write.
             return
         }
 

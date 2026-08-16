@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.thanu.smarthome.navigation.AppNavigation
+import com.thanu.smarthome.ui.theme.SmartHomeMonitoringTheme
 import com.thanu.smarthome.worker.SafetyMonitor
 import com.thanu.smarthome.worker.ScheduleMonitor
 
@@ -23,7 +24,9 @@ class MainActivity : ComponentActivity() {
         ScheduleMonitor.start()
 
         setContent {
-            AppNavigation()
+            SmartHomeMonitoringTheme {
+                AppNavigation()
+            }
         }
     }
 }
