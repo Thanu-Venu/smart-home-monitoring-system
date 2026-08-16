@@ -13,6 +13,16 @@ export const listenToHomes = (callback) => {
 };
 
 // Update device ON/OFF status
+//
+// Mirrors the Android app's DeviceViewModel.toggleDevice(): a manual
+// toggle from either client should stamp turnedOnAt (so SafetyMonitor's
+// maxOnDurationMinutes cutoff is timed correctly) and clear any
+// previous CRITICAL condition/alert, since the user taking control of
+// the device again means the old safety alert no longer applies. If
+// this simulator only wrote on/status like before, a device the
+// Android app auto-shut-off for safety would still show a stale
+// CRITICAL alert on the Android side even after being switched back on
+// here.
 export const updateDeviceStatus = async (
   homeId,
   floorId,
@@ -27,101 +37,46 @@ export const updateDeviceStatus = async (
   const updates = {
     on: isOn,
     status: isOn ? "ON" : "OFF",
-  };
-
-  if (isOn) {
-
-    updates.condition = "NORMAL";
-
-    // Store the time when iron/device was turned ON
-    updates.turnedOnAt = Date.now();
-
-  } else {
-
-    updates.condition = "NORMAL";
-
-    updates.turnedOnAt = null;
-
-  }
-
-  await update(
-    ref(db, devicePath),
-    updates
-  );
+    turnedOnAt: isOn ? Date.now() : 0,
+    condition: "NORMAL",
+    alert: "",
+  });
 };
 
-// Update Light/Fan schedule
-export const updateDeviceSchedule = async (
+// Toggle one switch on a MULTI_SWITCH gang-box device.
+//
+// A MULTI_SWITCH device stores its individually-addressable switches
+// as a "switches" array/object under the device node (see the Android
+// app's DeviceViewModel.toggleSwitch()). The device-level "on"/"status"
+// fields are derived from those switches (on = true if ANY switch is
+// on), so this writes the whole switches list back plus the
+// recomputed device-level fields in one update — never just the
+// device-level on/status — otherwise the Android app's per-switch UI
+// would show switches that don't match the card's overall ON/OFF
+// state.
+export const updateDeviceSwitch = async (
   homeId,
   floorId,
   roomId,
   deviceId,
-  scheduleEnabled,
-  scheduleStart,
-  scheduleEnd
-) => {
-
-  const devicePath =
-    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}`;
-
-  const updates = {
-    scheduleEnabled,
-    scheduleStart,
-    scheduleEnd,
-  };
-
-  await update(
-    ref(db, devicePath),
-    updates
-  );
-};
-
-// Update an individual switch inside a multi-switch board
-export const updateMultiSwitch = async (
-  homeId,
-  floorId,
-  roomId,
-  deviceId,
+  switches,
   switchId,
   isOn
 ) => {
 
-  const switchPath =
-    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}/switches/${switchId}`;
+  const devicePath = `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}`;
 
-  const updates = {
-    on: isOn,
-    status: isOn ? "ON" : "OFF",
-  };
-
-  await update(
-    ref(db, switchPath),
-    updates
+  const updatedSwitches = switches.map((deviceSwitch) =>
+    deviceSwitch.id === switchId
+      ? { ...deviceSwitch, on: isOn, status: isOn ? "ON" : "OFF" }
+      : deviceSwitch
   );
-};
-// Update schedule for an individual Multi-Switch
-export const updateMultiSwitchSchedule = async (
-  homeId,
-  floorId,
-  roomId,
-  deviceId,
-  switchId,
-  scheduleEnabled,
-  scheduleStart,
-  scheduleEnd
-) => {
 
-  const switchPath =
-    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}/switches/${switchId}`;
+  const anyOn = updatedSwitches.some((deviceSwitch) => deviceSwitch.on);
 
-  const updates = {
-    scheduleEnabled,
-    scheduleStart,
-    scheduleEnd,
-  };
-
-  await update(
-    ref(db, switchPath),
-    updates
-  );
+  await update(ref(db, devicePath), {
+    switches: updatedSwitches,
+    on: anyOn,
+    status: anyOn ? "ON" : "OFF",
+  });
 };

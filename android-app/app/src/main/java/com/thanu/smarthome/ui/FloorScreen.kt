@@ -159,22 +159,32 @@ fun FloorScreen(
 
             item {
 
-                Spacer(
-                    modifier = Modifier.height(32.dp)
-                )
+                /*
+                 * Wrapped in a Column: multiple direct Spacer/Text
+                 * children in a single LazyColumn item slot have no
+                 * arrangement of their own, so without this they
+                 * render stacked on top of each other instead of
+                 * top-to-bottom.
+                 */
+                Column {
 
-                Text(
-                    text = "No floors yet",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                    Spacer(
+                        modifier = Modifier.height(32.dp)
+                    )
 
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
+                    Text(
+                        text = "No floors yet",
+                        style = MaterialTheme.typography.titleMedium
+                    )
 
-                Text(
-                    text = "Tap + to create your first floor."
-                )
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
+                    Text(
+                        text = "Tap + to create your first floor."
+                    )
+                }
             }
         }
 
@@ -290,11 +300,14 @@ fun FloorScreen(
 
             if (uiState.isLoading) {
 
-                Spacer(
-                    modifier = Modifier.height(16.dp)
-                )
+                Column {
 
-                CircularProgressIndicator()
+                    Spacer(
+                        modifier = Modifier.height(16.dp)
+                    )
+
+                    CircularProgressIndicator()
+                }
             }
         }
 
@@ -304,24 +317,27 @@ fun FloorScreen(
          */
         item {
 
-            uiState.message?.let { message ->
+            Column {
 
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
+                uiState.message?.let { message ->
 
-                Text(message)
-            }
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
 
-            uiState.errorMessage?.let { message ->
+                    Text(message)
+                }
 
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
+                uiState.errorMessage?.let { message ->
 
-                Text(
-                    text = "Error: $message"
-                )
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
+
+                    Text(
+                        text = "Error: $message"
+                    )
+                }
             }
         }
     }
