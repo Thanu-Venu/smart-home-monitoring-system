@@ -1,40 +1,35 @@
-Add auth, safety cutoff, and real-time smart home features; fix sync bugs
+Add per-switch control, redesign UI with branding, fix schedule override bug
 
-Add auth, safety cutoff, and real-time smart home features; fix sync bugs
-
-Authentication & safety:
-- Add Firebase email/password authentication, scoping homes to the
-  signed-in user instead of a hardcoded user ID
-- Add SafetyMonitor worker to auto-turn-off devices (e.g. iron) that
-  exceed their configured maxOnDurationMinutes, with a CRITICAL alert
-  banner on the device card
-
-Real-time sync & UI:
-- Replace one-time fetches with live Firebase listeners across Home,
-  Floor, Room, and Device screens so changes from any client appear
-  without a manual refresh
-- Convert the Room screen to a 2-column grid with per-room device
-  summaries and safety-alert badges
-
-Device features:
-- Add manual device status simulation (ERROR/DISCONNECTED/Reconnect)
-  via a per-device overflow menu, since there's no real hardware
-- Add ScheduleMonitor worker to automatically turn lights on/off based
-  on their configured schedule window, including midnight wraparound
-- Add camera playback: a "View" button plays a device's cameraUri in
-  a looping video dialog
-- Add an in-app Reports screen (device/room/floor counts, breakdown
-  by type, active safety alerts) reachable from each home card
+Multi-Switch devices:
+- Add individually addressable per-switch toggles to the device card,
+  replacing the single combined on/off (spec explicitly calls out
+  "individually addressable switches" for gang-box units)
+- Fix editing a Multi-Switch device's switch count to actually resize
+  the underlying switches list instead of just updating a number
 
 Bug fixes:
-- Fix duplicate cards appearing on first create for homes, floors,
-  rooms, and devices: creation handlers were manually appending the
-  new item to local state while the newly-added real-time listener
-  also picked up the same write, causing a race that could double-add
-  it. Creation handlers now rely solely on the live listener.
-- Add stable key = { it.id } to all list views so Compose diffs by
-  Firebase ID instead of position
-- Fix missing/incorrect Compose layout-modifier imports (size, weight,
-  matchParentSize) causing compileDebugKotlin failures
-- Add .indexOn rule for homes/ownerId to fix a Firebase query error
-  on signup
+- Fix the 15-minute safety cutoff applying to every device type
+  instead of only Iron — maxOnDurationMinutes was being saved
+  unconditionally regardless of type
+- Fix ScheduleMonitor overriding manual light toggles: it was
+  re-enforcing the schedule window every 30 seconds regardless of
+  user action, so a manual override never lasted more than 30
+  seconds. Now edge-triggered — only acts exactly when a scheduled
+  start/end time is crossed, so manual control works in between
+  while automatic on/off at the scheduled times still applies
+- Fix MainActivity never actually applying the app's Compose theme,
+  so no custom styling was rendering at all
+
+UI redesign:
+- Replace the default template purple with a custom Material 3 color
+  palette (light + dark), WCAG AA contrast, dynamic color disabled
+  for consistent branding across devices
+- Replace the default Android Studio launcher icon with a custom
+  house logo (vector drawables), plus a matching in-app brand mark
+  on the Login/Sign Up screens
+- Recolor device status text (ON/OFF/ERROR/DISCONNECTED) with four
+  distinct theme colors instead of two, always paired with its
+  existing text label so status is never conveyed by color alone
+- Add a live dashboard summary (Floors/Rooms/Devices totals) to the
+  Home screen, and give every list card a tinted background instead
+  of flat white
