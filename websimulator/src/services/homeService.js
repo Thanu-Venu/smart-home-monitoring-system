@@ -40,7 +40,9 @@ export const updateDeviceStatus = async (
     turnedOnAt: isOn ? Date.now() : 0,
     condition: "NORMAL",
     alert: "",
-  });
+  };
+
+  await update(ref(db, devicePath), updates);
 };
 
 // Toggle one switch on a MULTI_SWITCH gang-box device.
