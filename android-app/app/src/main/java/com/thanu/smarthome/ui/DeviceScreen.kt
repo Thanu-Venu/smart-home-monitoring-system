@@ -221,7 +221,12 @@ fun DeviceScreen(
         roomId
     ) {
 
-        deviceViewModel.getDevices(
+        /*
+         * Real-time listener instead of a one-off fetch, so toggles
+         * made elsewhere (web simulator, another device) and the
+         * SafetyMonitor's automatic cutoffs show up instantly here.
+         */
+        deviceViewModel.startListening(
             homeId = homeId,
             floorId = floorId,
             roomId = roomId
@@ -535,6 +540,30 @@ fun DeviceScreen(
                                 )
                             }
                         }
+                    }
+
+
+                    /*
+                     * SAFETY ALERT
+                     *
+                     * Shown when SafetyMonitor has auto-switched this
+                     * device off for exceeding its maxOnDurationMinutes.
+                     */
+
+                    if (
+                        device.condition == "CRITICAL" &&
+                        device.alert.isNotBlank()
+                    ) {
+
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+
+                        Text(
+                            text = "⚠ ${device.alert}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
 
 

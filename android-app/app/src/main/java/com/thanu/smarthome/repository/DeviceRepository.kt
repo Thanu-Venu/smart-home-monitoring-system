@@ -1,7 +1,10 @@
 package com.thanu.smarthome.repository
 
 import android.util.Log
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.thanu.smarthome.model.Device
 
 class DeviceRepository {
@@ -135,6 +138,87 @@ class DeviceRepository {
                         ?: "Failed to retrieve devices"
                 )
             }
+    }
+
+
+    /*
+     * OBSERVE DEVICES (REAL-TIME)
+     *
+     * Attaches a live listener instead of doing a one-off fetch, so
+     * ON/OFF and safety-cutoff changes made anywhere (this app, the
+     * web simulator, or the SafetyMonitor worker) reflect on screen
+     * immediately without a manual refresh. Caller is responsible for
+     * detaching the returned listener via removeDevicesListener()
+     * once it is no longer needed (e.g. in ViewModel.onCleared()).
+     */
+    fun observeDevices(
+        homeId: String,
+        floorId: String,
+        roomId: String,
+        onDevices: (List<Device>) -> Unit,
+        onError: (String) -> Unit
+    ): ValueEventListener {
+
+        val devicesRef = homesRef
+            .child(homeId)
+            .child("floors")
+            .child(floorId)
+            .child("rooms")
+            .child(roomId)
+            .child("devices")
+
+        val listener = object : ValueEventListener {
+
+            override fun onDataChange(snapshot: DataSnapshot) {
+
+                val devices = snapshot.children.mapNotNull { child ->
+                    child.getValue(Device::class.java)
+                }
+
+                Log.d(
+                    "DeviceFirebase",
+                    "Devices updated (live): ${devices.size}"
+                )
+
+                onDevices(devices)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+
+                Log.e(
+                    "DeviceFirebase",
+                    "Device listener cancelled",
+                    error.toException()
+                )
+
+                onError(error.message)
+            }
+        }
+
+        devicesRef.addValueEventListener(listener)
+
+        return listener
+    }
+
+
+    /*
+     * STOP OBSERVING DEVICES
+     */
+    fun removeDevicesListener(
+        homeId: String,
+        floorId: String,
+        roomId: String,
+        listener: ValueEventListener
+    ) {
+
+        homesRef
+            .child(homeId)
+            .child("floors")
+            .child(floorId)
+            .child("rooms")
+            .child(roomId)
+            .child("devices")
+            .removeEventListener(listener)
     }
 
 
