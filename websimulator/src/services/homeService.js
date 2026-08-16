@@ -1,5 +1,6 @@
-import { ref, onValue, update, } from "firebase/database";
+import { ref, onValue, update } from "firebase/database";
 import { db } from "../firebase/firebaseConfig";
+
 
 
 export const listenToHomes = (callback) => {
@@ -30,9 +31,10 @@ export const updateDeviceStatus = async (
   isOn
 ) => {
 
-  const devicePath = `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}`;
+  const devicePath =
+    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}`;
 
-  await update(ref(db, devicePath), {
+  const updates = {
     on: isOn,
     status: isOn ? "ON" : "OFF",
     turnedOnAt: isOn ? Date.now() : 0,
