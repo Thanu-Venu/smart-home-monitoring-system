@@ -35,11 +35,6 @@ export const checkIronSafety = async (
       (Date.now() - turnedOnAt) / 60000;
   }
 
-  console.log("Iron temperature:", temperature);
-  console.log("Iron ON duration:", elapsedMinutes);
-  console.log("Maximum duration:", maxOnDurationMinutes);
-
-
   // --------------------------------
   // CRITICAL CONDITIONS
   // --------------------------------
@@ -105,6 +100,16 @@ export const checkIronSafety = async (
         status: "OFF",
 
         condition: "CRITICAL",
+
+        // Mirrors the device-level "alert" field the Android app's
+        // SafetyMonitor sets on its own cutoffs. Without this, a cutoff
+        // triggered from the web simulator would leave the device's
+        // alert field blank — and the Android Reports screen only
+        // counts a device as an active alert when BOTH
+        // condition == "CRITICAL" AND alert is non-blank (see
+        // ReportRepository.observeHomeReport), so the event would
+        // silently never show up there.
+        alert: alertMessage,
 
         turnedOnAt: null
 

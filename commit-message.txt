@@ -1,21 +1,5 @@
-Fix layout bugs and enforce consistent create/edit validation for devices
+Add per-switch naming and scheduling to Multi-Switch devices
 
-Layout:
-- Wrap the empty-state, loading, and message blocks in Home, Floors,
-  Rooms, and Devices screens in a Column. These previously emitted
-  multiple Text/Spacer children directly into a single list/grid item
-  slot with no arrangement, causing them to render stacked on top of
-  each other (e.g. "No rooms yet" overlapping its subtitle).
-- Wrap the app content in a Surface with safeDrawingPadding() in
-  MainActivity so every screen respects the status bar / display
-  cutout / navigation bar instead of drawing underneath them, since
-  the app targets a modern SDK that renders edge-to-edge by default.
-
-Validation:
-- Replace the free-text "Maximum ON Duration" field in the edit-device
-  dialog with the same fixed dropdown used when creating an Iron, and
-  the free-text "Number of Switches" field with the same +/- stepper
-  clamped to 2-5 used when creating a Multi-Switch device. Editing
-  previously allowed values creating a device never could (a 0/blank
-  Iron duration silently disabling the safety cutoff, or a switch
-  count outside 2-5), so the two flows now share one set of rules.
+- Name and optionally schedule each switch individually in create/edit
+- Extend ScheduleMonitor to enforce per-switch schedules, not just device-level
+- Make the create/edit device dialog scrollable to fit the new fields
