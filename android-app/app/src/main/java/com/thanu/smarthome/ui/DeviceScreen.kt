@@ -187,8 +187,18 @@ fun DeviceScreen(
         mutableStateOf("")
     }
 
+    /*
+     * Both stored the same way the create-dialog versions are
+     * (Int, clamped by UI controls rather than free text) so editing
+     * a device can't produce a value creating one never could — see
+     * the Iron/Multi-Switch settings blocks in the edit dialog below.
+     */
     var editMaxOnDuration by remember {
-        mutableStateOf("")
+        mutableIntStateOf(15)
+    }
+
+    var editIronDurationExpanded by remember {
+        mutableStateOf(false)
     }
 
     var editSwitchCount by remember {
@@ -416,22 +426,32 @@ fun DeviceScreen(
 
             item {
 
-                Spacer(
-                    modifier = Modifier.height(32.dp)
-                )
+                /*
+                 * Wrapped in a Column: multiple direct Spacer/Text
+                 * children in a single LazyColumn item slot have no
+                 * arrangement of their own, so without this they
+                 * render stacked on top of each other instead of
+                 * top-to-bottom.
+                 */
+                Column {
 
-                Text(
-                    text = "No devices yet",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                    Spacer(
+                        modifier = Modifier.height(32.dp)
+                    )
 
-                Spacer(
-                    modifier = Modifier.height(4.dp)
-                )
+                    Text(
+                        text = "No devices yet",
+                        style = MaterialTheme.typography.titleMedium
+                    )
 
-                Text(
-                    text = "Tap + to add a device."
-                )
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
+
+                    Text(
+                        text = "Tap + to add a device."
+                    )
+                }
             }
         }
 
@@ -865,12 +885,26 @@ fun DeviceScreen(
 
                                 editMaxOnDuration =
                                     if (device.maxOnDurationMinutes > 0) {
-                                        device.maxOnDurationMinutes.toString()
+                                        device.maxOnDurationMinutes
                                     } else {
-                                        ""
+                                        // Same default the create dialog
+                                        // starts a new Iron at.
+                                        15
                                     }
 
-                                editSwitchCount = device.switchCount
+                                editIronDurationExpanded = false
+
+                                editSwitchCount =
+                                    if (device.switchCount in 2..5) {
+                                        device.switchCount
+                                    } else {
+                                        // Same default the create dialog
+                                        // starts a new Multi-Switch at —
+                                        // covers any pre-existing device
+                                        // saved before this range was
+                                        // enforced everywhere.
+                                        2
+                                    }
 
                                 editCameraUri = device.cameraUri
 
@@ -917,11 +951,14 @@ fun DeviceScreen(
 
             if (uiState.isLoading) {
 
-                Spacer(
-                    modifier = Modifier.height(16.dp)
-                )
+                Column {
 
-                CircularProgressIndicator()
+                    Spacer(
+                        modifier = Modifier.height(16.dp)
+                    )
+
+                    CircularProgressIndicator()
+                }
             }
         }
 
@@ -932,26 +969,29 @@ fun DeviceScreen(
 
         item {
 
-            uiState.message?.let { message ->
+            Column {
 
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
+                uiState.message?.let { message ->
 
-                Text(
-                    text = message
-                )
-            }
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
 
-            uiState.errorMessage?.let { message ->
+                    Text(
+                        text = message
+                    )
+                }
 
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
+                uiState.errorMessage?.let { message ->
 
-                Text(
-                    text = "Error: $message"
-                )
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
+
+                    Text(
+                        text = "Error: $message"
+                    )
+                }
             }
         }
     }
@@ -2081,23 +2121,71 @@ fun DeviceScreen(
                             modifier = Modifier.height(8.dp)
                         )
 
-                        OutlinedTextField(
-                            value = editMaxOnDuration,
+                        /*
+                         * Same fixed-options dropdown as the create
+                         * dialog (ironDurationOptions), not a free-text
+                         * field — otherwise editing an existing Iron
+                         * could set an empty/zero/negative duration
+                         * that disables the safety cutoff entirely,
+                         * something creating a new Iron never allowed.
+                         */
+                        ExposedDropdownMenuBox(
+                            expanded = editIronDurationExpanded,
 
-                            onValueChange = {
-                                editMaxOnDuration = it
-                            },
+                            onExpandedChange = {
+                                editIronDurationExpanded =
+                                    !editIronDurationExpanded
+                            }
+                        ) {
 
-                            label = {
-                                Text(
-                                    "Maximum ON Duration (minutes)"
-                                )
-                            },
+                            OutlinedTextField(
+                                value = "$editMaxOnDuration minutes",
 
-                            singleLine = true,
+                                onValueChange = {},
 
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                                readOnly = true,
+
+                                label = {
+                                    Text("Maximum ON Duration")
+                                },
+
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(
+                                        expanded = editIronDurationExpanded
+                                    )
+                                },
+
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
+                            )
+
+                            ExposedDropdownMenu(
+                                expanded = editIronDurationExpanded,
+
+                                onDismissRequest = {
+                                    editIronDurationExpanded = false
+                                }
+                            ) {
+
+                                ironDurationOptions.forEach { minutes ->
+
+                                    DropdownMenuItem(
+
+                                        text = {
+                                            Text("$minutes minutes")
+                                        },
+
+                                        onClick = {
+
+                                            editMaxOnDuration = minutes
+
+                                            editIronDurationExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
 
 
@@ -2128,24 +2216,48 @@ fun DeviceScreen(
                             modifier = Modifier.height(8.dp)
                         )
 
-                        OutlinedTextField(
-                            value =
-                                editSwitchCount.toString(),
+                        /*
+                         * Same +/- stepper as the create dialog,
+                         * clamped to 2-5 — not a free-text field, so
+                         * editing an existing device can't set a
+                         * switch count creating one never allowed
+                         * (0, 1, or an arbitrarily large number).
+                         */
+                        Text(
+                            text = "Number of switches: $editSwitchCount"
+                        )
 
-                            onValueChange = { value ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
 
-                                value.toIntOrNull()?.let {
-                                    editSwitchCount = it
+                            TextButton(
+                                onClick = {
+
+                                    if (editSwitchCount > 2) {
+                                        editSwitchCount--
+                                    }
                                 }
-                            },
+                            ) {
+                                Text("-")
+                            }
 
-                            label = {
-                                Text("Number of Switches")
-                            },
+                            TextButton(
+                                onClick = {
 
-                            singleLine = true,
+                                    if (editSwitchCount < 5) {
+                                        editSwitchCount++
+                                    }
+                                }
+                            ) {
+                                Text("+")
+                            }
+                        }
 
-                            modifier = Modifier.fillMaxWidth()
+                        Text(
+                            text = "Supported: 2 to 5 switches",
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
 
@@ -2279,8 +2391,6 @@ fun DeviceScreen(
                             maxOnDurationMinutes =
                                 if (device.type == "IRON") {
                                     editMaxOnDuration
-                                        .toIntOrNull()
-                                        ?: 0
                                 } else {
                                     0
                                 },

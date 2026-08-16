@@ -346,18 +346,28 @@ fun HomeScreen(
 
             item {
 
-                Spacer(
-                    modifier = Modifier.height(32.dp)
-                )
+                /*
+                 * Wrapped in a Column: multiple direct Spacer/Text
+                 * children in a single LazyColumn item slot have no
+                 * arrangement of their own, so without this they
+                 * render stacked on top of each other instead of
+                 * top-to-bottom.
+                 */
+                Column {
 
-                Text(
-                    text = "No homes yet",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                    Spacer(
+                        modifier = Modifier.height(32.dp)
+                    )
 
-                Text(
-                    text = "Tap + to create your first home."
-                )
+                    Text(
+                        text = "No homes yet",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Text(
+                        text = "Tap + to create your first home."
+                    )
+                }
             }
         }
 
@@ -369,11 +379,14 @@ fun HomeScreen(
 
             if (uiState.isLoading) {
 
-                Spacer(
-                    modifier = Modifier.height(16.dp)
-                )
+                Column {
 
-                CircularProgressIndicator()
+                    Spacer(
+                        modifier = Modifier.height(16.dp)
+                    )
+
+                    CircularProgressIndicator()
+                }
             }
         }
 
@@ -383,26 +396,29 @@ fun HomeScreen(
          */
         item {
 
-            uiState.message?.let { message ->
+            Column {
 
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
+                uiState.message?.let { message ->
 
-                Text(
-                    text = message
-                )
-            }
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
 
-            uiState.errorMessage?.let { message ->
+                    Text(
+                        text = message
+                    )
+                }
 
-                Spacer(
-                    modifier = Modifier.height(12.dp)
-                )
+                uiState.errorMessage?.let { message ->
 
-                Text(
-                    text = "Error: $message"
-                )
+                    Spacer(
+                        modifier = Modifier.height(12.dp)
+                    )
+
+                    Text(
+                        text = "Error: $message"
+                    )
+                }
             }
         }
     }
