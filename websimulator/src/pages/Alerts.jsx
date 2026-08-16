@@ -392,7 +392,7 @@ function Alerts() {
 
                       {/* Maximum Duration */}
 
-                      {alert.maxOnDurationMinutes && (
+                      {alert.maxOnDurationMinutes > 0 && (
 
                         <div className="alert-details">
 
