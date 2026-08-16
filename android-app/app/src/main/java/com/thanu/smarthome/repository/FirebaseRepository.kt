@@ -1,7 +1,11 @@
 package com.thanu.smarthome.repository
 
 import android.util.Log
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.Query
+import com.google.firebase.database.ValueEventListener
 import com.thanu.smarthome.model.Home
 
 class FirebaseRepository {
@@ -151,6 +155,77 @@ class FirebaseRepository {
                 )
             }
     }
+
+    /*
+     * OBSERVE HOMES (REAL-TIME)
+     *
+     * Live version of getHomes() — keeps the home list in sync
+     * automatically instead of requiring a manual refresh. Returns
+     * both the listener AND the exact Query it was attached to,
+     * since removeEventListener() must be called on that same Query.
+     */
+    fun observeHomes(
+        ownerId: String,
+        onHomes: (List<Home>) -> Unit,
+        onError: (String) -> Unit
+    ): Pair<Query, ValueEventListener> {
+
+        val query = homesRef
+            .orderByChild("ownerId")
+            .equalTo(ownerId)
+
+        val listener = object : ValueEventListener {
+
+            override fun onDataChange(snapshot: DataSnapshot) {
+
+                val homes = mutableListOf<Home>()
+
+                for (childSnapshot in snapshot.children) {
+
+                    val home = childSnapshot.getValue(Home::class.java)
+
+                    if (home != null) {
+                        homes.add(home)
+                    }
+                }
+
+                Log.d(
+                    "FirebaseTest",
+                    "Homes updated (live): ${homes.size}"
+                )
+
+                onHomes(homes)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+
+                Log.e(
+                    "FirebaseTest",
+                    "Home listener cancelled",
+                    error.toException()
+                )
+
+                onError(error.message)
+            }
+        }
+
+        query.addValueEventListener(listener)
+
+        return query to listener
+    }
+
+
+    /*
+     * STOP OBSERVING HOMES
+     */
+    fun removeHomesListener(
+        query: Query,
+        listener: ValueEventListener
+    ) {
+
+        query.removeEventListener(listener)
+    }
+
 
     fun updateHome(
         home: Home,

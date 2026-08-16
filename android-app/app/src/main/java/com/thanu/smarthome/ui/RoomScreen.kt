@@ -1,22 +1,41 @@
 package com.thanu.smarthome.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Balcony
+import androidx.compose.material.icons.filled.Bathtub
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Hotel
+import androidx.compose.material.icons.filled.Kitchen
+import androidx.compose.material.icons.filled.LocalLaundryService
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Weekend
+import androidx.compose.material.icons.filled.Yard
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,10 +58,37 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.thanu.smarthome.model.Room
+import com.thanu.smarthome.model.RoomSummary
 import com.thanu.smarthome.viewmodel.RoomViewModel
+
+
+/*
+ * Maps a free-text room "type" (e.g. "Bedroom", "bathroom",
+ * "Kitchen Utility Area") to a representative icon for the
+ * abstract floor grid. Falls back to a generic house icon.
+ */
+private fun roomTypeIcon(type: String): ImageVector {
+
+    val normalized = type.lowercase()
+
+    return when {
+        normalized.contains("bed") -> Icons.Default.Hotel
+        normalized.contains("bath") -> Icons.Default.Bathtub
+        normalized.contains("kitchen") -> Icons.Default.Kitchen
+        normalized.contains("living") -> Icons.Default.Weekend
+        normalized.contains("dining") -> Icons.Default.Weekend
+        normalized.contains("study") || normalized.contains("office") -> Icons.Default.MenuBook
+        normalized.contains("garage") -> Icons.Default.DirectionsCar
+        normalized.contains("laundry") || normalized.contains("utility") -> Icons.Default.LocalLaundryService
+        normalized.contains("balcony") -> Icons.Default.Balcony
+        normalized.contains("garden") -> Icons.Default.Yard
+        else -> Icons.Default.Home
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -224,13 +270,13 @@ fun RoomScreen(
 
     /*
      * ------------------------------------------------
-     * LOAD ROOMS
+     * LOAD ROOMS (REAL-TIME)
      * ------------------------------------------------
      */
 
     LaunchedEffect(homeId, floorId) {
 
-        roomViewModel.getRooms(
+        roomViewModel.startListening(
             homeId = homeId,
             floorId = floorId
         )
@@ -240,10 +286,20 @@ fun RoomScreen(
     /*
      * ------------------------------------------------
      * MAIN SCREEN
+     *
+     * An abstract grid of room tiles, per the spec's "abstract
+     * (simple) grid mapping overlaid onto specific floor layouts."
+     * Non-grid content (header, empty state, loading, messages)
+     * spans the full grid width via GridItemSpan.
      * ------------------------------------------------
      */
 
-    LazyColumn(
+    val fullWidthSpan: LazyGridItemSpanScope.() -> GridItemSpan = {
+        GridItemSpan(maxLineSpan)
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp)
@@ -253,7 +309,7 @@ fun RoomScreen(
          * HEADER
          */
 
-        item {
+        item(span = fullWidthSpan) {
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -334,7 +390,7 @@ fun RoomScreen(
             !uiState.isLoading
         ) {
 
-            item {
+            item(span = fullWidthSpan) {
 
                 Spacer(
                     modifier = Modifier.height(32.dp)
@@ -358,45 +414,130 @@ fun RoomScreen(
 
 
         /*
-         * ROOM LIST
+         * ROOM GRID
+         *
+         * Abstract grid tile per room: type icon, name, and a
+         * live device summary badge (count / ON count / alert)
+         * derived from roomSummaries. Tapping the tile opens its
+         * devices; Edit/Delete stay as small icons at the bottom.
          */
 
-        items(uiState.rooms) { room ->
+        items(
+            items = uiState.rooms,
+            key = { room -> room.id }
+        ) { room ->
+
+            val summary =
+                uiState.roomSummaries[room.id] ?: RoomSummary()
 
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp)
+                    .aspectRatio(0.85f)
+                    .padding(6.dp)
+                    .clickable {
+
+                        onOpenDevices(
+                            homeId,
+                            floorId,
+                            room.id,
+                            room.name
+                        )
+                    }
             ) {
 
                 Column(
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(14.dp)
                 ) {
 
-                    Text(
-                        text = room.name,
-                        style =
-                            MaterialTheme.typography.titleLarge
-                    )
+                    /*
+                     * ROOM TYPE ICON
+                     */
 
-                    Spacer(
-                        modifier = Modifier.height(4.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
 
-                    Text(
-                        text = "Type: ${room.type}",
-                        style =
-                            MaterialTheme.typography.bodyMedium
-                    )
-
-                    Text(
-                        text = "ID: ${room.id}",
-                        style =
-                            MaterialTheme.typography.bodySmall
-                    )
+                        Icon(
+                            imageVector = roomTypeIcon(room.type),
+                            contentDescription = room.type,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
 
                     Spacer(
                         modifier = Modifier.height(10.dp)
+                    )
+
+                    Text(
+                        text = room.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 2
+                    )
+
+                    Text(
+                        text = room.type,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    Spacer(
+                        modifier = Modifier.weight(1f)
+                    )
+
+
+                    /*
+                     * DEVICE SUMMARY BADGE
+                     */
+
+                    if (summary.hasCriticalAlert) {
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = "Alert",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+
+                            Spacer(
+                                modifier = Modifier.width(4.dp)
+                            )
+
+                            Text(
+                                text = "Safety alert",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+
+                    } else if (summary.deviceCount > 0) {
+
+                        Text(
+                            text = "${summary.devicesOn}/${summary.deviceCount} devices ON",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                    } else {
+
+                        Text(
+                            text = "No devices yet",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
                     )
 
 
@@ -408,31 +549,6 @@ fun RoomScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-
-                        /*
-                         * OPEN DEVICES
-                         */
-
-                        IconButton(
-                            onClick = {
-
-                                onOpenDevices(
-                                    homeId,
-                                    floorId,
-                                    room.id,
-                                    room.name
-                                )
-                            }
-                        ) {
-
-                            Icon(
-                                imageVector =
-                                    Icons.Default.ArrowForward,
-                                contentDescription =
-                                    "Open ${room.name}"
-                            )
-                        }
-
 
                         /*
                          * EDIT
@@ -447,15 +563,21 @@ fun RoomScreen(
                                 editRoomType = room.type
                             },
 
-                            enabled = !uiState.isLoading
+                            enabled = !uiState.isLoading,
+                            modifier = Modifier.size(32.dp)
                         ) {
 
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription =
-                                    "Edit ${room.name}"
+                                    "Edit ${room.name}",
+                                modifier = Modifier.size(18.dp)
                             )
                         }
+
+                        Spacer(
+                            modifier = Modifier.width(4.dp)
+                        )
 
 
                         /*
@@ -468,13 +590,15 @@ fun RoomScreen(
                                 deletingRoom = room
                             },
 
-                            enabled = !uiState.isLoading
+                            enabled = !uiState.isLoading,
+                            modifier = Modifier.size(32.dp)
                         ) {
 
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription =
-                                    "Delete ${room.name}"
+                                    "Delete ${room.name}",
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -487,7 +611,7 @@ fun RoomScreen(
          * LOADING
          */
 
-        item {
+        item(span = fullWidthSpan) {
 
             if (uiState.isLoading) {
 
@@ -504,7 +628,7 @@ fun RoomScreen(
          * SUCCESS / ERROR
          */
 
-        item {
+        item(span = fullWidthSpan) {
 
             uiState.message?.let { message ->
 

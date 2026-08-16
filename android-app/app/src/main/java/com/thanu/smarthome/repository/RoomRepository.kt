@@ -1,8 +1,12 @@
 package com.thanu.smarthome.repository
 
 import android.util.Log
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.thanu.smarthome.model.Room
+import com.thanu.smarthome.model.RoomSummary
 
 class RoomRepository {
 
@@ -124,6 +128,122 @@ class RoomRepository {
                         ?: "Failed to retrieve rooms"
                 )
             }
+    }
+
+
+    /*
+     * OBSERVE ROOMS (REAL-TIME)
+     *
+     * Also derives a lightweight per-room device summary (count,
+     * how many are ON, whether any has an active CRITICAL alert)
+     * straight from the same snapshot — the "devices" node is
+     * nested under each room in Firebase, so no second query is
+     * needed to power the room-grid tiles.
+     */
+    fun observeRooms(
+        homeId: String,
+        floorId: String,
+        onRooms: (List<Room>, Map<String, RoomSummary>) -> Unit,
+        onError: (String) -> Unit
+    ): ValueEventListener {
+
+        val roomsRef = homesRef
+            .child(homeId)
+            .child("floors")
+            .child(floorId)
+            .child("rooms")
+
+        val listener = object : ValueEventListener {
+
+            override fun onDataChange(snapshot: DataSnapshot) {
+
+                val rooms = mutableListOf<Room>()
+                val summaries = mutableMapOf<String, RoomSummary>()
+
+                for (roomSnapshot in snapshot.children) {
+
+                    val room = roomSnapshot.getValue(Room::class.java)
+
+                    if (room != null) {
+                        rooms.add(room)
+                    }
+
+                    var deviceCount = 0
+                    var devicesOn = 0
+                    var hasCriticalAlert = false
+
+                    for (deviceSnapshot in roomSnapshot.child("devices").children) {
+
+                        deviceCount++
+
+                        val isOn =
+                            deviceSnapshot.child("on").getValue(Boolean::class.java) ?: false
+
+                        if (isOn) {
+                            devicesOn++
+                        }
+
+                        val condition =
+                            deviceSnapshot.child("condition").getValue(String::class.java)
+
+                        if (condition == "CRITICAL") {
+                            hasCriticalAlert = true
+                        }
+                    }
+
+                    val roomId = roomSnapshot.key
+
+                    if (roomId != null) {
+
+                        summaries[roomId] = RoomSummary(
+                            deviceCount = deviceCount,
+                            devicesOn = devicesOn,
+                            hasCriticalAlert = hasCriticalAlert
+                        )
+                    }
+                }
+
+                Log.d(
+                    "RoomFirebase",
+                    "Rooms updated (live): ${rooms.size}"
+                )
+
+                onRooms(rooms, summaries)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+
+                Log.e(
+                    "RoomFirebase",
+                    "Room listener cancelled",
+                    error.toException()
+                )
+
+                onError(error.message)
+            }
+        }
+
+        roomsRef.addValueEventListener(listener)
+
+        return listener
+    }
+
+
+    /*
+     * STOP OBSERVING ROOMS
+     */
+    fun removeRoomsListener(
+        homeId: String,
+        floorId: String,
+        listener: ValueEventListener
+    ) {
+
+        homesRef
+            .child(homeId)
+            .child("floors")
+            .child(floorId)
+            .child("rooms")
+            .removeEventListener(listener)
     }
 
 

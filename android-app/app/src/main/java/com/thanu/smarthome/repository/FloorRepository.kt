@@ -1,7 +1,10 @@
 package com.thanu.smarthome.repository
 
 import android.util.Log
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 import com.thanu.smarthome.model.Floor
 
 class FloorRepository {
@@ -121,6 +124,68 @@ class FloorRepository {
                         ?: "Failed to retrieve floors"
                 )
             }
+    }
+
+
+    /*
+     * OBSERVE FLOORS (REAL-TIME)
+     */
+    fun observeFloors(
+        homeId: String,
+        onFloors: (List<Floor>) -> Unit,
+        onError: (String) -> Unit
+    ): ValueEventListener {
+
+        val floorsRef = homesRef
+            .child(homeId)
+            .child("floors")
+
+        val listener = object : ValueEventListener {
+
+            override fun onDataChange(snapshot: DataSnapshot) {
+
+                val floors = snapshot.children.mapNotNull { child ->
+                    child.getValue(Floor::class.java)
+                }
+
+                Log.d(
+                    "FirebaseFloor",
+                    "Floors updated (live): ${floors.size}"
+                )
+
+                onFloors(floors)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+
+                Log.e(
+                    "FirebaseFloor",
+                    "Floor listener cancelled",
+                    error.toException()
+                )
+
+                onError(error.message)
+            }
+        }
+
+        floorsRef.addValueEventListener(listener)
+
+        return listener
+    }
+
+
+    /*
+     * STOP OBSERVING FLOORS
+     */
+    fun removeFloorsListener(
+        homeId: String,
+        listener: ValueEventListener
+    ) {
+
+        homesRef
+            .child(homeId)
+            .child("floors")
+            .removeEventListener(listener)
     }
 
 

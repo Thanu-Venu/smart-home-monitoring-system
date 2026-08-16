@@ -79,11 +79,11 @@ fun FloorScreen(
     }
 
     /*
-     * LOAD FLOORS FOR SELECTED HOME
+     * LOAD FLOORS FOR SELECTED HOME (REAL-TIME)
      */
     LaunchedEffect(homeId) {
 
-        floorViewModel.getFloors(homeId)
+        floorViewModel.startListening(homeId)
     }
 
     LazyColumn(
@@ -181,7 +181,10 @@ fun FloorScreen(
         /*
          * FLOOR LIST
          */
-        items(uiState.floors) { floor ->
+        items(
+            uiState.floors,
+            key = { floor -> floor.id }
+        ) { floor ->
 
             Card(
                 modifier = Modifier

@@ -1,6 +1,7 @@
 package com.thanu.smarthome.viewmodel
 
 import androidx.lifecycle.ViewModel
+import com.google.firebase.database.ValueEventListener
 import com.thanu.smarthome.model.Room
 import com.thanu.smarthome.model.RoomUiState
 import com.thanu.smarthome.repository.RoomRepository
@@ -16,6 +17,94 @@ class RoomViewModel : ViewModel() {
 
     val uiState: StateFlow<RoomUiState> =
         _uiState.asStateFlow()
+
+    private var roomsListener: ValueEventListener? = null
+    private var listeningHomeId: String? = null
+    private var listeningFloorId: String? = null
+
+
+    /*
+     * START LISTENING (REAL-TIME)
+     */
+    fun startListening(
+        homeId: String,
+        floorId: String
+    ) {
+
+        if (
+            roomsListener != null &&
+            listeningHomeId == homeId &&
+            listeningFloorId == floorId
+        ) {
+            return
+        }
+
+        stopListening()
+
+        _uiState.value = _uiState.value.copy(
+            isLoading = true,
+            message = null,
+            errorMessage = null
+        )
+
+        listeningHomeId = homeId
+        listeningFloorId = floorId
+
+        roomsListener = repository.observeRooms(
+            homeId = homeId,
+            floorId = floorId,
+
+            onRooms = { rooms, summaries ->
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    rooms = rooms,
+                    roomSummaries = summaries,
+                    errorMessage = null
+                )
+            },
+
+            onError = { message ->
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = message
+                )
+            }
+        )
+    }
+
+
+    /*
+     * STOP LISTENING
+     */
+    fun stopListening() {
+
+        val listener = roomsListener
+        val homeId = listeningHomeId
+        val floorId = listeningFloorId
+
+        if (
+            listener != null &&
+            homeId != null &&
+            floorId != null
+        ) {
+
+            repository.removeRoomsListener(
+                homeId = homeId,
+                floorId = floorId,
+                listener = listener
+            )
+        }
+
+        roomsListener = null
+    }
+
+
+    override fun onCleared() {
+        super.onCleared()
+        stopListening()
+    }
 
 
     /*
@@ -40,12 +129,16 @@ class RoomViewModel : ViewModel() {
 
             onSuccess = { createdRoom ->
 
-                val updatedRooms =
-                    _uiState.value.rooms + createdRoom
+                /*
+                 * Don't append createdRoom to the local list here.
+                 * A real-time listener (startListening) is already
+                 * attached on this screen and will receive this same
+                 * write from Firebase and update `rooms` on its own.
+                 * Appending it here too would create a duplicate card.
+                 */
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    rooms = updatedRooms,
                     room = createdRoom,
                     message = "Room created successfully!",
                     errorMessage = null

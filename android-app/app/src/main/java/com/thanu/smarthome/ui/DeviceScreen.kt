@@ -1,5 +1,7 @@
 package com.thanu.smarthome.ui
 
+import android.net.Uri
+import android.widget.VideoView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -15,9 +19,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -38,6 +45,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.thanu.smarthome.model.Device
 import com.thanu.smarthome.model.DeviceSwitch
@@ -206,6 +215,17 @@ fun DeviceScreen(
 
     var deletingDevice by remember {
         mutableStateOf<Device?>(null)
+    }
+
+
+    /*
+     * ------------------------------------------------
+     * CAMERA PREVIEW
+     * ------------------------------------------------
+     */
+
+    var viewingCameraUri by remember {
+        mutableStateOf<String?>(null)
     }
 
 
@@ -419,7 +439,10 @@ fun DeviceScreen(
          * DEVICE LIST
          */
 
-        items(uiState.devices) { device ->
+        items(
+            uiState.devices,
+            key = { device -> device.id }
+        ) { device ->
 
             Card(
                 modifier = Modifier
@@ -465,14 +488,27 @@ fun DeviceScreen(
 
                             Text(
                                 text = "Status: ${device.status}",
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = when (device.status) {
+                                    "ERROR" -> MaterialTheme.colorScheme.error
+                                    "DISCONNECTED" -> MaterialTheme.colorScheme.outline
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
                             )
                         }
 
 
                         /*
                          * BASIC ON/OFF CONTROL
+                         *
+                         * Disabled while ERROR/DISCONNECTED — a device
+                         * that isn't reachable can't be toggled until
+                         * it's reconnected via the overflow menu.
                          */
+
+                        val isControllable =
+                            device.status != "ERROR" &&
+                                    device.status != "DISCONNECTED"
 
                         Switch(
                             checked = device.on,
@@ -485,7 +521,7 @@ fun DeviceScreen(
                                     device = device
                                 )
                             },
-                            enabled = !uiState.isLoading
+                            enabled = !uiState.isLoading && isControllable
                         )
                     }
 
@@ -534,8 +570,43 @@ fun DeviceScreen(
 
                             if (device.cameraUri.isNotBlank()) {
 
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+
+                                    Text(
+                                        text = "Camera configured",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+
+                                    Spacer(
+                                        modifier = Modifier.width(8.dp)
+                                    )
+
+                                    TextButton(
+                                        onClick = {
+                                            viewingCameraUri = device.cameraUri
+                                        }
+                                    ) {
+
+                                        Icon(
+                                            imageVector = Icons.Default.PlayCircle,
+                                            contentDescription = "View ${device.name} stream",
+                                            modifier = Modifier.size(16.dp)
+                                        )
+
+                                        Spacer(
+                                            modifier = Modifier.width(4.dp)
+                                        )
+
+                                        Text("View")
+                                    }
+                                }
+
+                            } else {
+
                                 Text(
-                                    text = "Camera configured",
+                                    text = "No camera URI configured",
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             }
@@ -590,10 +661,110 @@ fun DeviceScreen(
                      * ACTIONS
                      */
 
+                    var showStatusMenu by remember(device.id) {
+                        mutableStateOf(false)
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
+
+                        /*
+                         * SIMULATE CONNECTIVITY STATUS
+                         *
+                         * There's no real hardware feeding ERROR /
+                         * DISCONNECTED states, so this lets the demo
+                         * show all four statuses the spec asks for
+                         * (ON, OFF, ERROR, DISCONNECTED).
+                         */
+
+                        Box {
+
+                            IconButton(
+                                onClick = {
+                                    showStatusMenu = true
+                                },
+                                enabled = !uiState.isLoading
+                            ) {
+
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "More actions for ${device.name}"
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showStatusMenu,
+                                onDismissRequest = {
+                                    showStatusMenu = false
+                                }
+                            ) {
+
+                                if (
+                                    device.status == "ERROR" ||
+                                    device.status == "DISCONNECTED"
+                                ) {
+
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text("Reconnect (back to normal)")
+                                        },
+                                        onClick = {
+
+                                            deviceViewModel.setDeviceStatus(
+                                                homeId = homeId,
+                                                floorId = floorId,
+                                                roomId = roomId,
+                                                device = device,
+                                                newStatus = "NORMAL"
+                                            )
+
+                                            showStatusMenu = false
+                                        }
+                                    )
+
+                                } else {
+
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text("Simulate: Disconnected")
+                                        },
+                                        onClick = {
+
+                                            deviceViewModel.setDeviceStatus(
+                                                homeId = homeId,
+                                                floorId = floorId,
+                                                roomId = roomId,
+                                                device = device,
+                                                newStatus = "DISCONNECTED"
+                                            )
+
+                                            showStatusMenu = false
+                                        }
+                                    )
+
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text("Simulate: Error")
+                                        },
+                                        onClick = {
+
+                                            deviceViewModel.setDeviceStatus(
+                                                homeId = homeId,
+                                                floorId = floorId,
+                                                roomId = roomId,
+                                                device = device,
+                                                newStatus = "ERROR"
+                                            )
+
+                                            showStatusMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
 
                         /*
                          * EDIT
@@ -2074,6 +2245,81 @@ fun DeviceScreen(
                 }
             }
         )
+    }
+
+
+    /*
+     * ==================================================
+     * CAMERA PREVIEW DIALOG
+     *
+     * Plays the device's mock cameraUri (an mp4 stream/snapshot
+     * URL) using the framework's VideoView — no extra media
+     * dependency needed for a short looping demo clip.
+     * ==================================================
+     */
+
+    viewingCameraUri?.let { uri ->
+
+        Dialog(
+            onDismissRequest = {
+                viewingCameraUri = null
+            }
+        ) {
+
+            Card {
+
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+
+                    Text(
+                        text = "Camera Preview",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
+                    AndroidView(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp),
+                        factory = { context ->
+
+                            VideoView(context).apply {
+
+                                setVideoURI(Uri.parse(uri))
+
+                                setOnPreparedListener { mediaPlayer ->
+                                    mediaPlayer.isLooping = true
+                                    start()
+                                }
+                            }
+                        }
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+
+                        TextButton(
+                            onClick = {
+                                viewingCameraUri = null
+                            }
+                        ) {
+
+                            Text("Close")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

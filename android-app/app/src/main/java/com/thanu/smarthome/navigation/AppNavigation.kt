@@ -9,6 +9,7 @@ import com.thanu.smarthome.ui.DeviceScreen
 import com.thanu.smarthome.ui.FloorScreen
 import com.thanu.smarthome.ui.HomeScreen
 import com.thanu.smarthome.ui.LoginScreen
+import com.thanu.smarthome.ui.ReportsScreen
 import com.thanu.smarthome.ui.RoomScreen
 import com.thanu.smarthome.ui.SignUpScreen
 
@@ -101,6 +102,13 @@ fun AppNavigation() {
                     )
                 },
 
+                onOpenReports = { homeId ->
+
+                    navController.navigate(
+                        "reports/$homeId"
+                    )
+                },
+
                 onLogout = {
 
                     navController.navigate("login") {
@@ -110,6 +118,33 @@ fun AppNavigation() {
                     }
                 }
             )
+        }
+
+
+        /*
+         * ==============================================
+         * REPORTS SCREEN
+         * ==============================================
+         */
+
+        composable(
+            route = "reports/{homeId}"
+        ) { backStackEntry ->
+
+            val homeId =
+                backStackEntry.arguments
+                    ?.getString("homeId")
+
+            if (homeId != null) {
+
+                ReportsScreen(
+                    homeId = homeId,
+
+                    onBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
         }
 
 
