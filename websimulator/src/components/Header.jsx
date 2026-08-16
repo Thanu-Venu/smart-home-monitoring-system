@@ -1,4 +1,6 @@
 function Header({ homeName }) {
+  const avatarLetter =
+    homeName?.trim()?.charAt(0)?.toUpperCase() || "H";
   return (
     <header className="header">
       <div>
@@ -10,7 +12,7 @@ function Header({ homeName }) {
         <button className="icon-button">🔔</button>
 
         <div className="profile">
-          <div className="avatar">P</div>
+          <div className="avatar">{avatarLetter}</div>
 
           <div>
             <strong>Owner</strong>

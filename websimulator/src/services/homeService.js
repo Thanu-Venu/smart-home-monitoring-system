@@ -1,15 +1,79 @@
-import { ref, onValue, update, get } from "firebase/database";
-import { db } from "../firebase/firebaseConfig";
+import { ref, onValue, update, query, orderByChild,equalTo } from "firebase/database";
+import { onAuthStateChanged, } from "firebase/auth";
+import { db, auth, } from "../firebase/firebaseConfig";
 
 
 
 export const listenToHomes = (callback) => {
-  const homeRef = ref(db, "homes");
+  let databaseUnsubscribe = null;
 
-  return onValue(homeRef, (snapshot) => {
-    const data = snapshot.val();
-    callback(data);
-  });
+    const authUnsubscribe =
+    onAuthStateChanged(
+      auth,
+      (user) => {
+         console.log("AUTH USER:", user);
+
+        // No user logged in
+        if (!user) {
+           console.log("NO USER LOGGED IN");
+
+          if (databaseUnsubscribe) {
+            databaseUnsubscribe();
+            databaseUnsubscribe = null;
+          }
+
+          callback(null);
+          return;
+        }
+        
+        console.log(
+          "Logged-in User UID:",
+          user.uid
+        );
+
+
+        // Query homes using ownerId
+        const homesQuery = query(
+          ref(db, "homes"),
+          orderByChild("ownerId"),
+          equalTo(user.uid)
+        );
+        
+        console.log("QUERY OWNER ID:", user.uid);
+
+        // Listen for realtime changes
+        databaseUnsubscribe =
+          onValue(
+            homesQuery,
+            (snapshot) => {
+
+              const data =
+                snapshot.val();
+
+              console.log(
+                "User Homes:",
+                data
+              );
+
+              callback(data);
+
+            }
+          );
+
+      }
+    );
+
+
+  // Cleanup
+  return () => {
+
+    authUnsubscribe();
+
+    if (databaseUnsubscribe) {
+      databaseUnsubscribe();
+    }
+
+  };
 };
 
 // Update device ON/OFF status
