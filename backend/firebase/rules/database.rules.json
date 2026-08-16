@@ -2,7 +2,8 @@
   "rules": {
     "homes": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null",
+      ".indexOn": ["ownerId"]
     },
     ".read": false,
     ".write": false

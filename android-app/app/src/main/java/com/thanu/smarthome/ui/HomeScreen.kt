@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -44,6 +45,7 @@ import com.thanu.smarthome.viewmodel.HomeViewModel
 @Composable
 fun HomeScreen(
     onOpenFloors: (String) -> Unit,
+    onOpenReports: (String) -> Unit,
     onLogout: () -> Unit,
     homeViewModel: HomeViewModel = viewModel()
 ) {
@@ -82,10 +84,10 @@ fun HomeScreen(
     }
 
     /*
-     * LOAD HOMES
+     * LOAD HOMES (REAL-TIME)
      */
     LaunchedEffect(currentUserId) {
-        homeViewModel.getHomes(currentUserId)
+        homeViewModel.startListening(currentUserId)
     }
 
     LazyColumn(
@@ -160,7 +162,10 @@ fun HomeScreen(
         /*
          * HOME LIST
          */
-        items(uiState.homes) { home ->
+        items(
+            uiState.homes,
+            key = { home -> home.id }
+        ) { home ->
 
             Card(
                 modifier = Modifier
@@ -238,6 +243,23 @@ fun HomeScreen(
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Delete ${home.name}"
+                            )
+                        }
+
+                        /*
+                         * REPORTS
+                         */
+                        IconButton(
+                            onClick = {
+
+                                onOpenReports(home.id)
+                            },
+                            enabled = !uiState.isLoading
+                        ) {
+
+                            Icon(
+                                imageVector = Icons.Default.Assessment,
+                                contentDescription = "View report for ${home.name}"
                             )
                         }
 

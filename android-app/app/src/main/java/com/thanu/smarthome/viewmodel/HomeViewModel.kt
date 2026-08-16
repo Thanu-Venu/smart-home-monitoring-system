@@ -1,6 +1,8 @@
 package com.thanu.smarthome.viewmodel
 
 import androidx.lifecycle.ViewModel
+import com.google.firebase.database.Query
+import com.google.firebase.database.ValueEventListener
 import com.thanu.smarthome.model.Home
 import com.thanu.smarthome.model.HomeUiState
 import com.thanu.smarthome.repository.FirebaseRepository
@@ -15,6 +17,75 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
 
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    private var homesQuery: Query? = null
+    private var homesListener: ValueEventListener? = null
+
+
+    /*
+     * START LISTENING (REAL-TIME)
+     */
+    fun startListening(ownerId: String) {
+
+        stopListening()
+
+        _uiState.value = _uiState.value.copy(
+            isLoading = true,
+            message = null,
+            errorMessage = null
+        )
+
+        val (query, listener) = repository.observeHomes(
+            ownerId = ownerId,
+
+            onHomes = { homes ->
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    homes = homes,
+                    errorMessage = null
+                )
+            },
+
+            onError = { message ->
+
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = message
+                )
+            }
+        )
+
+        homesQuery = query
+        homesListener = listener
+    }
+
+
+    /*
+     * STOP LISTENING
+     */
+    fun stopListening() {
+
+        val query = homesQuery
+        val listener = homesListener
+
+        if (query != null && listener != null) {
+
+            repository.removeHomesListener(
+                query = query,
+                listener = listener
+            )
+        }
+
+        homesQuery = null
+        homesListener = null
+    }
+
+
+    override fun onCleared() {
+        super.onCleared()
+        stopListening()
+    }
 
 
     /*
@@ -37,12 +108,16 @@ class HomeViewModel : ViewModel() {
 
             onSuccess = { home ->
 
-                val updatedHomes =
-                    _uiState.value.homes + home
+                /*
+                 * Don't append `home` to the local list here.
+                 * A real-time listener (startListening) is already
+                 * attached on this screen and will receive this same
+                 * write from Firebase and update `homes` on its own.
+                 * Appending it here too would create a duplicate card.
+                 */
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    homes = updatedHomes,
                     selectedHome = home,
                     message = "Home Created Successfully!",
                     errorMessage = null

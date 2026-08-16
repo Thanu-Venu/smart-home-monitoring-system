@@ -147,12 +147,18 @@ class DeviceViewModel : ViewModel() {
 
             onSuccess = { createdDevice ->
 
-                val updatedDevices =
-                    _uiState.value.devices + createdDevice
+                /*
+                 * Don't append createdDevice to the local list here.
+                 * A real-time listener (startListening) is already
+                 * attached on this screen and will receive this same
+                 * write from Firebase and update `devices` on its own.
+                 * Appending it here too would create a duplicate card
+                 * (and, depending on event ordering, could leave a
+                 * stale/incomplete duplicate onscreen).
+                 */
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    devices = updatedDevices,
                     device = createdDevice,
                     message = "Device created successfully!",
                     errorMessage = null
@@ -357,6 +363,55 @@ class DeviceViewModel : ViewModel() {
             condition = "NORMAL",
             alert = ""
         )
+
+        updateDevice(
+            homeId = homeId,
+            floorId = floorId,
+            roomId = roomId,
+            device = updatedDevice
+        )
+    }
+
+
+    /*
+     * SIMULATE STATUS (ERROR / DISCONNECTED / NORMAL)
+     *
+     * There's no real hardware behind these devices, so this lets
+     * the demo show off the spec's four-state status model
+     * (ON / OFF / ERROR / DISCONNECTED) by manually flipping a
+     * device's connectivity state. A device in ERROR or DISCONNECTED
+     * is treated as uncontrollable — it's forced OFF and its toggle
+     * is disabled in the UI until it's reconnected.
+     */
+    fun setDeviceStatus(
+        homeId: String,
+        floorId: String,
+        roomId: String,
+        device: Device,
+        newStatus: String
+    ) {
+
+        val updatedDevice = if (
+            newStatus == "ERROR" ||
+            newStatus == "DISCONNECTED"
+        ) {
+
+            device.copy(
+                status = newStatus,
+                on = false,
+                turnedOnAt = 0L
+            )
+
+        } else {
+
+            // "Reconnect" / back to normal — resume reflecting
+            // the underlying on/off state.
+            device.copy(
+                status = if (device.on) "ON" else "OFF",
+                condition = "NORMAL",
+                alert = ""
+            )
+        }
 
         updateDevice(
             homeId = homeId,
