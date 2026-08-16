@@ -44,6 +44,13 @@ import kotlin.coroutines.resumeWithException
  * Devices the user has manually marked ERROR/DISCONNECTED (via
  * DeviceScreen's "Simulate" menu) are left alone — a device that
  * isn't reachable can't be scheduled.
+ *
+ * A Multi-Switch (gang-box) device can ALSO have its own individual
+ * switches scheduled independently (e.g. a "Light Switch" that should
+ * follow a schedule, sitting next to a "Fan Switch" that shouldn't) —
+ * see checkSwitchSchedules. This is checked separately from the
+ * device-level schedule above, since a Multi-Switch device itself
+ * never has scheduleEnabled = true (only its individual switches do).
  */
 object ScheduleMonitor {
 
@@ -68,10 +75,13 @@ object ScheduleMonitor {
     private var isRunning = false
 
     /*
-     * deviceId -> "was this device inside its schedule window as of
-     * the last check?". Rebuilt fresh every check cycle (see
-     * checkAllDevices), so deleted/no-longer-scheduled devices drop
-     * out on their own instead of leaking forever.
+     * "was this schedule-controlled thing inside its window as of the
+     * last check?". Keyed by deviceId for a device-level schedule, or
+     * "deviceId/switches/switchId" for an individual switch's own
+     * schedule — the two never collide since a switchId always has a
+     * "/switches/" segment in it. Rebuilt fresh every check cycle (see
+     * checkAllDevices), so deleted/no-longer-scheduled devices and
+     * switches drop out on their own instead of leaking forever.
      */
     private var lastWindowState: Map<String, Boolean> = emptyMap()
 
@@ -131,7 +141,32 @@ object ScheduleMonitor {
 
                         val deviceId = deviceSnapshot.key ?: continue
 
-                        checkDevice(
+                        // A manually-simulated fault means neither
+                        // the device's own schedule nor any of its
+                        // switches' schedules should be touched.
+                        val status =
+                            deviceSnapshot.child("status")
+                                .getValue(String::class.java) ?: "OFF"
+
+                        if (status == "ERROR" || status == "DISCONNECTED") {
+                            continue
+                        }
+
+                        checkDeviceLevelSchedule(
+                            homeId = homeId,
+                            floorId = floorId,
+                            roomId = roomId,
+                            deviceId = deviceId,
+                            deviceSnapshot = deviceSnapshot,
+                            nowMinutes = nowMinutes,
+                            newWindowState = newWindowState
+                        )
+
+                        // Independent of the device-level schedule
+                        // above — a Multi-Switch device's own
+                        // scheduleEnabled is always false, its
+                        // switches carry their own schedules instead.
+                        checkSwitchSchedules(
                             homeId = homeId,
                             floorId = floorId,
                             roomId = roomId,
@@ -149,7 +184,7 @@ object ScheduleMonitor {
     }
 
 
-    private fun checkDevice(
+    private fun checkDeviceLevelSchedule(
         homeId: String,
         floorId: String,
         roomId: String,
@@ -163,14 +198,6 @@ object ScheduleMonitor {
             deviceSnapshot.child("scheduleEnabled").getValue(Boolean::class.java) ?: false
 
         if (!scheduleEnabled) {
-            return
-        }
-
-        val status =
-            deviceSnapshot.child("status").getValue(String::class.java) ?: "OFF"
-
-        // Don't fight a manually-simulated fault state.
-        if (status == "ERROR" || status == "DISCONNECTED") {
             return
         }
 
@@ -245,6 +272,148 @@ object ScheduleMonitor {
             "status" to if (shouldBeOn) "ON" else "OFF",
             "turnedOnAt" to if (shouldBeOn) System.currentTimeMillis() else 0L
         )
+
+        deviceRef.updateChildren(updates)
+    }
+
+
+    /*
+     * Same edge-triggered on/off logic as checkDeviceLevelSchedule,
+     * but applied per-switch for a Multi-Switch device — each switch
+     * carries its own scheduleEnabled/scheduleStart/scheduleEnd,
+     * independent of every other switch on the same gang-box.
+     *
+     * After changing a switch's own on/status, the device-level
+     * on/status is also recomputed from ALL of the device's switches
+     * (anyOn) in the same write, so the device card and room-grid
+     * summary — which read the device-level "on" field directly,
+     * not the individual switches — stay in sync. This mirrors
+     * DeviceViewModel.toggleSwitch()'s derivation logic on the manual
+     * toggle path.
+     */
+    private fun checkSwitchSchedules(
+        homeId: String,
+        floorId: String,
+        roomId: String,
+        deviceId: String,
+        deviceSnapshot: DataSnapshot,
+        nowMinutes: Int,
+        newWindowState: MutableMap<String, Boolean>
+    ) {
+
+        val switchesSnapshot = deviceSnapshot.child("switches")
+
+        if (!switchesSnapshot.hasChildren()) {
+            return
+        }
+
+        // Current on/off state of every switch on this device, so
+        // recomputing "is any switch on" after this cycle's changes
+        // doesn't require a second Firebase read.
+        val currentSwitchOnStates =
+            switchesSnapshot.children.associate { switchSnapshot ->
+
+                (switchSnapshot.key ?: "") to
+                        (
+                                switchSnapshot.child("on")
+                                    .getValue(Boolean::class.java) ?: false
+                                )
+            }
+
+        // Switch id -> new on/off state, only for switches this cycle
+        // actually changes (schedule boundary crossed). Applied to
+        // currentSwitchOnStates below to get the final anyOn.
+        val changedSwitchStates = mutableMapOf<String, Boolean>()
+
+        for (switchSnapshot in switchesSnapshot.children) {
+
+            val switchId = switchSnapshot.key ?: continue
+
+            val switchScheduleEnabled =
+                switchSnapshot.child("scheduleEnabled")
+                    .getValue(Boolean::class.java) ?: false
+
+            if (!switchScheduleEnabled) {
+                continue
+            }
+
+            val startMinutes =
+                parseTimeToMinutes(
+                    switchSnapshot.child("scheduleStart")
+                        .getValue(String::class.java)
+                )
+
+            val endMinutes =
+                parseTimeToMinutes(
+                    switchSnapshot.child("scheduleEnd")
+                        .getValue(String::class.java)
+                )
+
+            if (startMinutes == null || endMinutes == null) {
+                continue
+            }
+
+            val shouldBeOn =
+                isWithinWindow(nowMinutes, startMinutes, endMinutes)
+
+            val windowKey = "$deviceId/switches/$switchId"
+
+            newWindowState[windowKey] = shouldBeOn
+
+            val previousShouldBeOn = lastWindowState[windowKey]
+
+            if (previousShouldBeOn != null && previousShouldBeOn == shouldBeOn) {
+                // No boundary crossed — leave a manual override alone.
+                continue
+            }
+
+            val isOn = currentSwitchOnStates[switchId] ?: false
+
+            if (shouldBeOn == isOn) {
+                continue
+            }
+
+            changedSwitchStates[switchId] = shouldBeOn
+        }
+
+        if (changedSwitchStates.isEmpty()) {
+            return
+        }
+
+        val deviceRef = homesRef
+            .child(homeId)
+            .child("floors")
+            .child(floorId)
+            .child("rooms")
+            .child(roomId)
+            .child("devices")
+            .child(deviceId)
+
+        val deviceName =
+            deviceSnapshot.child("name").getValue(String::class.java) ?: "Device"
+
+        val updates = mutableMapOf<String, Any>()
+
+        for ((switchId, shouldBeOn) in changedSwitchStates) {
+
+            Log.d(
+                TAG,
+                "$deviceName ($deviceId) switch $switchId schedule window " +
+                        "changed -> " + (if (shouldBeOn) "ON" else "OFF")
+            )
+
+            updates["switches/$switchId/on"] = shouldBeOn
+            updates["switches/$switchId/status"] =
+                if (shouldBeOn) "ON" else "OFF"
+        }
+
+        val finalSwitchOnStates =
+            currentSwitchOnStates + changedSwitchStates
+
+        val anyOn = finalSwitchOnStates.values.any { it }
+
+        updates["on"] = anyOn
+        updates["status"] = if (anyOn) "ON" else "OFF"
 
         deviceRef.updateChildren(updates)
     }

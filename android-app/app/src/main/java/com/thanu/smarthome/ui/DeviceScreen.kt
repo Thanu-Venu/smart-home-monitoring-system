@@ -4,6 +4,8 @@ import android.net.Uri
 import android.widget.VideoView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -149,6 +152,45 @@ fun DeviceScreen(
     }
 
     /*
+     * One editable name per switch (e.g. "Fan Switch", "Light
+     * Switch") instead of the generic "Switch 1"/"Switch 2" default,
+     * so a gang-box's individual switches are actually identifiable
+     * — kept in sync with switchCount by the +/- handlers below.
+     */
+    val switchNames = remember {
+        mutableStateListOf("Switch 1", "Switch 2")
+    }
+
+    /*
+     * Per-switch scheduling — same idea as a Light's own
+     * scheduleEnabled/scheduleStart/scheduleEnd, but one set of
+     * values per switch, since e.g. a "Light Switch" might want a
+     * schedule while a "Fan Switch" on the same gang-box doesn't.
+     * Parallel lists indexed the same way as switchNames.
+     */
+    val switchScheduleEnabled = remember {
+        mutableStateListOf(false, false)
+    }
+
+    val switchScheduleStart = remember {
+        mutableStateListOf("", "")
+    }
+
+    val switchScheduleEnd = remember {
+        mutableStateListOf("", "")
+    }
+
+    /*
+     * Which switch's start/end time is currently being picked (index,
+     * isStart) — one shared TimePickerDialog handles all switches
+     * instead of needing a separate dialog per switch, since the
+     * switch count is variable (2-5).
+     */
+    var activeSwitchTimeEdit by remember {
+        mutableStateOf<Pair<Int, Boolean>?>(null)
+    }
+
+    /*
      * CAMERA SETTINGS
      */
 
@@ -205,6 +247,32 @@ fun DeviceScreen(
         mutableIntStateOf(2)
     }
 
+    /*
+     * Same idea as switchNames above, but for the edit dialog —
+     * populated from the device's actual switches when Edit is
+     * tapped (see the IconButton below), so renaming a switch, or
+     * naming a newly-added one when growing the count, both work.
+     */
+    val editSwitchNames = remember {
+        mutableStateListOf<String>()
+    }
+
+    val editSwitchScheduleEnabled = remember {
+        mutableStateListOf<Boolean>()
+    }
+
+    val editSwitchScheduleStart = remember {
+        mutableStateListOf<String>()
+    }
+
+    val editSwitchScheduleEnd = remember {
+        mutableStateListOf<String>()
+    }
+
+    var activeEditSwitchTimeEdit by remember {
+        mutableStateOf<Pair<Int, Boolean>?>(null)
+    }
+
     var editCameraUri by remember {
         mutableStateOf("")
     }
@@ -237,6 +305,29 @@ fun DeviceScreen(
 
     var viewingCameraUri by remember {
         mutableStateOf<String?>(null)
+    }
+
+
+    /*
+     * Resets the create-dialog's switch name/schedule lists back to
+     * a fresh 2-switch default. Pulled out since this needs to happen
+     * at three different points (opening the dialog, after a
+     * successful Create, and on Cancel) and duplicating four
+     * clear()+add() calls at each site would be easy to miss one of.
+     */
+    fun resetSwitchForm() {
+
+        switchNames.clear()
+        switchNames.addAll(listOf("Switch 1", "Switch 2"))
+
+        switchScheduleEnabled.clear()
+        switchScheduleEnabled.addAll(listOf(false, false))
+
+        switchScheduleStart.clear()
+        switchScheduleStart.addAll(listOf("", ""))
+
+        switchScheduleEnd.clear()
+        switchScheduleEnd.addAll(listOf("", ""))
     }
 
 
@@ -395,6 +486,7 @@ fun DeviceScreen(
                         maxOnDuration = 15
 
                         switchCount = 2
+                        resetSwitchForm()
 
                         cameraUri = ""
 
@@ -643,10 +735,26 @@ fun DeviceScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
 
-                                    Text(
-                                        text = deviceSwitch.name,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                                    Column {
+
+                                        Text(
+                                            text = deviceSwitch.name,
+                                            style =
+                                                MaterialTheme.typography.bodyMedium
+                                        )
+
+                                        if (deviceSwitch.scheduleEnabled) {
+
+                                            Text(
+                                                text = "Schedule: " +
+                                                        "${deviceSwitch.scheduleStart}" +
+                                                        " - " +
+                                                        "${deviceSwitch.scheduleEnd}",
+                                                style =
+                                                    MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
 
                                     Switch(
                                         checked = deviceSwitch.on,
@@ -906,6 +1014,47 @@ fun DeviceScreen(
                                         2
                                     }
 
+                                // Seed the name fields from this
+                                // device's actual switches (falling
+                                // back to a generic name for any slot
+                                // that doesn't have one yet).
+                                editSwitchNames.clear()
+                                editSwitchNames.addAll(
+                                    (1..editSwitchCount).map { index ->
+
+                                        device.switches
+                                            .find { it.id == "switch$index" }
+                                            ?.name
+                                            ?.takeIf { it.isNotBlank() }
+                                            ?: "Switch $index"
+                                    }
+                                )
+
+                                // Seed each switch's schedule fields
+                                // the same way.
+                                editSwitchScheduleEnabled.clear()
+                                editSwitchScheduleStart.clear()
+                                editSwitchScheduleEnd.clear()
+
+                                (1..editSwitchCount).forEach { index ->
+
+                                    val existingSwitch =
+                                        device.switches.find {
+                                            it.id == "switch$index"
+                                        }
+
+                                    editSwitchScheduleEnabled.add(
+                                        existingSwitch?.scheduleEnabled
+                                            ?: false
+                                    )
+                                    editSwitchScheduleStart.add(
+                                        existingSwitch?.scheduleStart ?: ""
+                                    )
+                                    editSwitchScheduleEnd.add(
+                                        existingSwitch?.scheduleEnd ?: ""
+                                    )
+                                }
+
                                 editCameraUri = device.cameraUri
 
                                 showEditStartTimePicker = false
@@ -1108,6 +1257,96 @@ fun DeviceScreen(
         }
     }
 
+    /*
+     * Shared time picker for the CREATE dialog's per-switch
+     * schedules. One dialog handles every switch (index 0-4) instead
+     * of needing a separate showXTimePicker/showYTimePicker pair per
+     * switch, since the switch count is variable (2-5) — see
+     * activeSwitchTimeEdit's declaration.
+     */
+    activeSwitchTimeEdit?.let { (switchIndex, isStart) ->
+
+        val currentValue =
+            if (isStart) {
+                switchScheduleStart.getOrElse(switchIndex) { "" }
+            } else {
+                switchScheduleEnd.getOrElse(switchIndex) { "" }
+            }
+
+        val (hour, minute) = parseTime(currentValue)
+
+        val timePickerState = rememberTimePickerState(
+            initialHour = hour,
+            initialMinute = minute,
+            is24Hour = false
+        )
+
+        TimePickerDialog(
+            onDismissRequest = {
+                activeSwitchTimeEdit = null
+            },
+
+            title = {
+                Text(
+                    if (isStart) {
+                        "Select Start Time"
+                    } else {
+                        "Select End Time"
+                    }
+                )
+            },
+
+            confirmButton = {
+
+                TextButton(
+                    onClick = {
+
+                        val formatted = String.format(
+                            java.util.Locale.getDefault(),
+                            "%02d:%02d",
+                            timePickerState.hour,
+                            timePickerState.minute
+                        )
+
+                        if (isStart) {
+
+                            if (switchIndex < switchScheduleStart.size) {
+                                switchScheduleStart[switchIndex] = formatted
+                            }
+
+                        } else {
+
+                            if (switchIndex < switchScheduleEnd.size) {
+                                switchScheduleEnd[switchIndex] = formatted
+                            }
+                        }
+
+                        activeSwitchTimeEdit = null
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+                    onClick = {
+                        activeSwitchTimeEdit = null
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+
+            TimePicker(
+                state = timePickerState
+            )
+        }
+    }
+
+
     if (showEditStartTimePicker) {
 
         val (hour, minute) = parseTime(editScheduleStart)
@@ -1222,6 +1461,95 @@ fun DeviceScreen(
 
 
     /*
+     * Same shared-dialog approach as activeSwitchTimeEdit above, but
+     * for the EDIT dialog's per-switch schedules.
+     */
+    activeEditSwitchTimeEdit?.let { (switchIndex, isStart) ->
+
+        val currentValue =
+            if (isStart) {
+                editSwitchScheduleStart.getOrElse(switchIndex) { "" }
+            } else {
+                editSwitchScheduleEnd.getOrElse(switchIndex) { "" }
+            }
+
+        val (hour, minute) = parseTime(currentValue)
+
+        val timePickerState = rememberTimePickerState(
+            initialHour = hour,
+            initialMinute = minute,
+            is24Hour = false
+        )
+
+        TimePickerDialog(
+            onDismissRequest = {
+                activeEditSwitchTimeEdit = null
+            },
+
+            title = {
+                Text(
+                    if (isStart) {
+                        "Select Start Time"
+                    } else {
+                        "Select End Time"
+                    }
+                )
+            },
+
+            confirmButton = {
+
+                TextButton(
+                    onClick = {
+
+                        val formatted = String.format(
+                            java.util.Locale.getDefault(),
+                            "%02d:%02d",
+                            timePickerState.hour,
+                            timePickerState.minute
+                        )
+
+                        if (isStart) {
+
+                            if (switchIndex < editSwitchScheduleStart.size) {
+                                editSwitchScheduleStart[switchIndex] =
+                                    formatted
+                            }
+
+                        } else {
+
+                            if (switchIndex < editSwitchScheduleEnd.size) {
+                                editSwitchScheduleEnd[switchIndex] =
+                                    formatted
+                            }
+                        }
+
+                        activeEditSwitchTimeEdit = null
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+                    onClick = {
+                        activeEditSwitchTimeEdit = null
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+
+            TimePicker(
+                state = timePickerState
+            )
+        }
+    }
+
+
+    /*
      * ==================================================
      * CREATE DEVICE DIALOG
      * ==================================================
@@ -1240,7 +1568,18 @@ fun DeviceScreen(
 
             text = {
 
-                Column {
+                /*
+                 * Scrollable: with a Multi-Switch device's per-switch
+                 * name + schedule fields (up to 5 switches, each with
+                 * its own toggle and optional start/end time fields),
+                 * this content can easily be taller than the dialog's
+                 * available height. Without scrolling, anything past
+                 * that point was simply unreachable — this is what
+                 * was reported as "can't scroll it".
+                 */
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
 
                     /*
                      * DEVICE TYPE DROPDOWN
@@ -1626,7 +1965,26 @@ fun DeviceScreen(
                                 onClick = {
 
                                     if (switchCount > 2) {
+
                                         switchCount--
+
+                                        // Drop the name/schedule for
+                                        // the switch that no longer
+                                        // exists.
+                                        if (switchNames.size > switchCount) {
+                                            switchNames.removeAt(
+                                                switchNames.lastIndex
+                                            )
+                                            switchScheduleEnabled.removeAt(
+                                                switchScheduleEnabled.lastIndex
+                                            )
+                                            switchScheduleStart.removeAt(
+                                                switchScheduleStart.lastIndex
+                                            )
+                                            switchScheduleEnd.removeAt(
+                                                switchScheduleEnd.lastIndex
+                                            )
+                                        }
                                     }
                                 }
                             ) {
@@ -1637,7 +1995,20 @@ fun DeviceScreen(
                                 onClick = {
 
                                     if (switchCount < 5) {
+
                                         switchCount++
+
+                                        // Give the newly-added switch a
+                                        // sensible default name and no
+                                        // schedule to start.
+                                        if (switchNames.size < switchCount) {
+                                            switchNames.add(
+                                                "Switch $switchCount"
+                                            )
+                                            switchScheduleEnabled.add(false)
+                                            switchScheduleStart.add("")
+                                            switchScheduleEnd.add("")
+                                        }
                                     }
                                 }
                             ) {
@@ -1649,6 +2020,150 @@ fun DeviceScreen(
                             text = "Supported: 2 to 5 switches",
                             style = MaterialTheme.typography.bodySmall
                         )
+
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+
+                        /*
+                         * Name each switch individually (e.g. "Fan
+                         * Switch", "Light Switch") — this is what
+                         * actually identifies which physical switch
+                         * is which once there's more than one on the
+                         * same gang-box — and optionally give it its
+                         * own on/off schedule, independent of the
+                         * other switches on the same device.
+                         */
+                        (1..switchCount).forEach { index ->
+
+                            val i = index - 1
+
+                            Spacer(
+                                modifier = Modifier.height(6.dp)
+                            )
+
+                            OutlinedTextField(
+                                value =
+                                    switchNames.getOrElse(i) {
+                                        "Switch $index"
+                                    },
+
+                                onValueChange = { newName ->
+
+                                    if (i < switchNames.size) {
+                                        switchNames[i] = newName
+                                    }
+                                },
+
+                                label = {
+                                    Text("Switch $index Name")
+                                },
+
+                                singleLine = true,
+
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+
+                                Text(
+                                    text = "Schedule this switch",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Switch(
+                                    checked =
+                                        switchScheduleEnabled.getOrElse(i) {
+                                            false
+                                        },
+
+                                    onCheckedChange = { checked ->
+
+                                        if (i < switchScheduleEnabled.size) {
+                                            switchScheduleEnabled[i] = checked
+                                        }
+                                    }
+                                )
+                            }
+
+                            if (switchScheduleEnabled.getOrElse(i) { false }) {
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement.spacedBy(8.dp)
+                                ) {
+
+                                    // Transparent clickable layer over
+                                    // each read-only field — same
+                                    // pattern as the Light schedule
+                                    // fields above.
+                                    Box(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+
+                                        OutlinedTextField(
+                                            value =
+                                                switchScheduleStart
+                                                    .getOrElse(i) { "" }
+                                                    .ifBlank { "Start" },
+
+                                            onValueChange = {},
+                                            readOnly = true,
+
+                                            label = {
+                                                Text("Start")
+                                            },
+
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                                .clickable {
+                                                    activeSwitchTimeEdit =
+                                                        i to true
+                                                }
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+
+                                        OutlinedTextField(
+                                            value =
+                                                switchScheduleEnd
+                                                    .getOrElse(i) { "" }
+                                                    .ifBlank { "End" },
+
+                                            onValueChange = {},
+                                            readOnly = true,
+
+                                            label = {
+                                                Text("End")
+                                            },
+
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                                .clickable {
+                                                    activeSwitchTimeEdit =
+                                                        i to false
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
 
@@ -1723,9 +2238,32 @@ fun DeviceScreen(
 
                                         DeviceSwitch(
                                             id = "switch$index",
-                                            name = "Switch $index",
+                                            name =
+                                                switchNames
+                                                    .getOrElse(index - 1) {
+                                                        "Switch $index"
+                                                    }
+                                                    .trim()
+                                                    .ifBlank {
+                                                        "Switch $index"
+                                                    },
                                             on = false,
-                                            status = "OFF"
+                                            status = "OFF",
+                                            scheduleEnabled =
+                                                switchScheduleEnabled
+                                                    .getOrElse(index - 1) {
+                                                        false
+                                                    },
+                                            scheduleStart =
+                                                switchScheduleStart
+                                                    .getOrElse(index - 1) {
+                                                        ""
+                                                    },
+                                            scheduleEnd =
+                                                switchScheduleEnd
+                                                    .getOrElse(index - 1) {
+                                                        ""
+                                                    }
                                         )
                                     }
 
@@ -1840,6 +2378,7 @@ fun DeviceScreen(
                             maxOnDuration = 15
 
                             switchCount = 2
+                            resetSwitchForm()
 
                             cameraUri = ""
 
@@ -1884,6 +2423,7 @@ fun DeviceScreen(
                         maxOnDuration = 15
 
                         switchCount = 2
+                        resetSwitchForm()
 
                         cameraUri = ""
                     }
@@ -1915,7 +2455,12 @@ fun DeviceScreen(
 
             text = {
 
-                Column {
+                // Same fix as the create dialog above — scrollable so
+                // a Multi-Switch device's per-switch fields don't get
+                // stuck below the visible area.
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
 
                     /*
                      * DEVICE NAME
@@ -2236,7 +2781,35 @@ fun DeviceScreen(
                                 onClick = {
 
                                     if (editSwitchCount > 2) {
+
                                         editSwitchCount--
+
+                                        if (
+                                            editSwitchNames.size >
+                                            editSwitchCount
+                                        ) {
+                                            editSwitchNames.removeAt(
+                                                editSwitchNames.lastIndex
+                                            )
+                                        }
+
+                                        if (
+                                            editSwitchScheduleEnabled.size >
+                                            editSwitchCount
+                                        ) {
+                                            editSwitchScheduleEnabled.removeAt(
+                                                editSwitchScheduleEnabled
+                                                    .lastIndex
+                                            )
+                                            editSwitchScheduleStart.removeAt(
+                                                editSwitchScheduleStart
+                                                    .lastIndex
+                                            )
+                                            editSwitchScheduleEnd.removeAt(
+                                                editSwitchScheduleEnd
+                                                    .lastIndex
+                                            )
+                                        }
                                     }
                                 }
                             ) {
@@ -2247,7 +2820,56 @@ fun DeviceScreen(
                                 onClick = {
 
                                     if (editSwitchCount < 5) {
+
                                         editSwitchCount++
+
+                                        // If this device previously had a
+                                        // switch at this slot (shrunk
+                                        // earlier in this same edit, or
+                                        // before), restore its original
+                                        // name/schedule instead of
+                                        // overwriting it.
+                                        val existingSwitch =
+                                            device.switches.find {
+                                                it.id ==
+                                                    "switch$editSwitchCount"
+                                            }
+
+                                        if (
+                                            editSwitchNames.size <
+                                            editSwitchCount
+                                        ) {
+
+                                            editSwitchNames.add(
+                                                existingSwitch?.name
+                                                    ?.takeIf {
+                                                        it.isNotBlank()
+                                                    }
+                                                    ?: "Switch $editSwitchCount"
+                                            )
+                                        }
+
+                                        if (
+                                            editSwitchScheduleEnabled.size <
+                                            editSwitchCount
+                                        ) {
+
+                                            editSwitchScheduleEnabled.add(
+                                                existingSwitch
+                                                    ?.scheduleEnabled
+                                                    ?: false
+                                            )
+                                            editSwitchScheduleStart.add(
+                                                existingSwitch
+                                                    ?.scheduleStart
+                                                    ?: ""
+                                            )
+                                            editSwitchScheduleEnd.add(
+                                                existingSwitch
+                                                    ?.scheduleEnd
+                                                    ?: ""
+                                            )
+                                        }
                                     }
                                 }
                             ) {
@@ -2259,6 +2881,141 @@ fun DeviceScreen(
                             text = "Supported: 2 to 5 switches",
                             style = MaterialTheme.typography.bodySmall
                         )
+
+                        Spacer(
+                            modifier = Modifier.height(8.dp)
+                        )
+
+                        (1..editSwitchCount).forEach { index ->
+
+                            val i = index - 1
+
+                            Spacer(
+                                modifier = Modifier.height(6.dp)
+                            )
+
+                            OutlinedTextField(
+                                value =
+                                    editSwitchNames.getOrElse(i) {
+                                        "Switch $index"
+                                    },
+
+                                onValueChange = { newName ->
+
+                                    if (i < editSwitchNames.size) {
+                                        editSwitchNames[i] = newName
+                                    }
+                                },
+
+                                label = {
+                                    Text("Switch $index Name")
+                                },
+
+                                singleLine = true,
+
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+
+                                Text(
+                                    text = "Schedule this switch",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Switch(
+                                    checked =
+                                        editSwitchScheduleEnabled
+                                            .getOrElse(i) { false },
+
+                                    onCheckedChange = { checked ->
+
+                                        if (i < editSwitchScheduleEnabled.size) {
+                                            editSwitchScheduleEnabled[i] =
+                                                checked
+                                        }
+                                    }
+                                )
+                            }
+
+                            if (
+                                editSwitchScheduleEnabled.getOrElse(i) {
+                                    false
+                                }
+                            ) {
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement =
+                                        Arrangement.spacedBy(8.dp)
+                                ) {
+
+                                    Box(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+
+                                        OutlinedTextField(
+                                            value =
+                                                editSwitchScheduleStart
+                                                    .getOrElse(i) { "" }
+                                                    .ifBlank { "Start" },
+
+                                            onValueChange = {},
+                                            readOnly = true,
+
+                                            label = {
+                                                Text("Start")
+                                            },
+
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                                .clickable {
+                                                    activeEditSwitchTimeEdit =
+                                                        i to true
+                                                }
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+
+                                        OutlinedTextField(
+                                            value =
+                                                editSwitchScheduleEnd
+                                                    .getOrElse(i) { "" }
+                                                    .ifBlank { "End" },
+
+                                            onValueChange = {},
+                                            readOnly = true,
+
+                                            label = {
+                                                Text("End")
+                                            },
+
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                                .clickable {
+                                                    activeEditSwitchTimeEdit =
+                                                        i to false
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
 
@@ -2337,10 +3094,50 @@ fun DeviceScreen(
 
                         val resizedSwitches =
                             if (isMultiSwitchEdit) {
+
+                                /*
+                                 * Resize first (preserves on/off state
+                                 * by id), then overlay whatever names
+                                 * are currently in the name fields —
+                                 * this is what lets renaming an
+                                 * existing switch (e.g. "Switch 1" ->
+                                 * "Fan Switch") actually stick, on top
+                                 * of the existing resize-by-id logic.
+                                 */
                                 resizeSwitches(
                                     existingSwitches = device.switches,
                                     targetCount = editSwitchCount
-                                )
+                                ).mapIndexed { index, deviceSwitch ->
+
+                                    val editedName =
+                                        editSwitchNames
+                                            .getOrNull(index)
+                                            ?.trim()
+
+                                    val named =
+                                        if (editedName.isNullOrBlank()) {
+                                            deviceSwitch
+                                        } else {
+                                            deviceSwitch.copy(
+                                                name = editedName
+                                            )
+                                        }
+
+                                    // Same overlay for this switch's
+                                    // schedule fields.
+                                    named.copy(
+                                        scheduleEnabled =
+                                            editSwitchScheduleEnabled
+                                                .getOrElse(index) { false },
+                                        scheduleStart =
+                                            editSwitchScheduleStart
+                                                .getOrElse(index) { "" },
+                                        scheduleEnd =
+                                            editSwitchScheduleEnd
+                                                .getOrElse(index) { "" }
+                                    )
+                                }
+
                             } else {
                                 device.switches
                             }

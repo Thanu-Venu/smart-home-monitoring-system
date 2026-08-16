@@ -41,5 +41,16 @@ data class DeviceSwitch(
     var id: String = "",
     var name: String = "",
     var on: Boolean = false,
-    var status: String = "OFF"
+    var status: String = "OFF",
+
+    // Per-switch automatic scheduling — mirrors Device's own
+    // scheduleEnabled/scheduleStart/scheduleEnd, but scoped to just
+    // this one switch, since a gang-box's switches can each control
+    // something different (e.g. one switch for a light that should
+    // follow a schedule, another for a fan that shouldn't). Matches
+    // the web simulator's updateMultiSwitchSchedule, which already
+    // schedules a single switch this same way.
+    var scheduleEnabled: Boolean = false,
+    var scheduleStart: String = "",
+    var scheduleEnd: String = ""
 )
