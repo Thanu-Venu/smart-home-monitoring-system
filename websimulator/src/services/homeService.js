@@ -1,4 +1,4 @@
-import { ref, onValue, update, query, orderByChild,equalTo } from "firebase/database";
+import { ref, onValue, update, get, query, orderByChild, equalTo } from "firebase/database";
 import { onAuthStateChanged, } from "firebase/auth";
 import { db, auth, } from "../firebase/firebaseConfig";
 
@@ -7,30 +7,29 @@ import { db, auth, } from "../firebase/firebaseConfig";
 export const listenToHomes = (callback) => {
   let databaseUnsubscribe = null;
 
-    const authUnsubscribe =
+  const authUnsubscribe =
     onAuthStateChanged(
       auth,
       (user) => {
-         console.log("AUTH USER:", user);
+
+        // A previous user's query listener (if any) is always torn
+        // down before doing anything else, whether we're now logging
+        // out or switching to a newly logged-in user. Without this,
+        // signing out and back in (or switching accounts) on the same
+        // tab leaves the old user's onValue listener running forever
+        // -- it keeps firing this callback with the old user's homes
+        // alongside the new one's, so the page can end up showing a
+        // mix of two different users' data.
+        if (databaseUnsubscribe) {
+          databaseUnsubscribe();
+          databaseUnsubscribe = null;
+        }
 
         // No user logged in
         if (!user) {
-           console.log("NO USER LOGGED IN");
-
-          if (databaseUnsubscribe) {
-            databaseUnsubscribe();
-            databaseUnsubscribe = null;
-          }
-
           callback(null);
           return;
         }
-        
-        console.log(
-          "Logged-in User UID:",
-          user.uid
-        );
-
 
         // Query homes using ownerId
         const homesQuery = query(
@@ -38,8 +37,6 @@ export const listenToHomes = (callback) => {
           orderByChild("ownerId"),
           equalTo(user.uid)
         );
-        
-        console.log("QUERY OWNER ID:", user.uid);
 
         // Listen for realtime changes
         databaseUnsubscribe =
@@ -49,11 +46,6 @@ export const listenToHomes = (callback) => {
 
               const data =
                 snapshot.val();
-
-              console.log(
-                "User Homes:",
-                data
-              );
 
               callback(data);
 
