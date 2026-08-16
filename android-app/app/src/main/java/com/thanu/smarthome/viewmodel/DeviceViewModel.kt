@@ -374,6 +374,67 @@ class DeviceViewModel : ViewModel() {
 
 
     /*
+     * TOGGLE INDIVIDUAL SWITCH (MULTI-SWITCH GANG-BOX UNITS)
+     *
+     * A Multi-Switch device is a single gang-box entity in Firebase,
+     * but it manages a variable number (2, 3, or 5) of separate,
+     * individually addressable switches. This flips just one of
+     * those switches, then re-derives the parent device's own
+     * on/status fields from all of its switches combined — so the
+     * device card, room-grid summary, and reports (which all read
+     * the device-level "on" field directly) stay in sync without
+     * needing to know anything about switches themselves.
+     */
+    fun toggleSwitch(
+        homeId: String,
+        floorId: String,
+        roomId: String,
+        device: Device,
+        switchId: String
+    ) {
+
+        val updatedSwitches = device.switches.map { deviceSwitch ->
+
+            if (deviceSwitch.id == switchId) {
+
+                val turningOn = !deviceSwitch.on
+
+                deviceSwitch.copy(
+                    on = turningOn,
+                    status = if (turningOn) "ON" else "OFF"
+                )
+
+            } else {
+                deviceSwitch
+            }
+        }
+
+        val anyOn = updatedSwitches.any { it.on }
+
+        val isControllable =
+            device.status != "ERROR" &&
+                    device.status != "DISCONNECTED"
+
+        val updatedDevice = device.copy(
+            switches = updatedSwitches,
+            on = anyOn,
+            status = if (isControllable) {
+                if (anyOn) "ON" else "OFF"
+            } else {
+                device.status
+            }
+        )
+
+        updateDevice(
+            homeId = homeId,
+            floorId = floorId,
+            roomId = roomId,
+            device = updatedDevice
+        )
+    }
+
+
+    /*
      * SIMULATE STATUS (ERROR / DISCONNECTED / NORMAL)
      *
      * There's no real hardware behind these devices, so this lets

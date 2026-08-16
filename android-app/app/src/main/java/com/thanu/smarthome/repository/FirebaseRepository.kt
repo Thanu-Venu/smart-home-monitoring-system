@@ -6,6 +6,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.Query
 import com.google.firebase.database.ValueEventListener
+import com.thanu.smarthome.model.DashboardSummary
 import com.thanu.smarthome.model.Home
 
 class FirebaseRepository {
@@ -166,7 +167,7 @@ class FirebaseRepository {
      */
     fun observeHomes(
         ownerId: String,
-        onHomes: (List<Home>) -> Unit,
+        onHomes: (List<Home>, DashboardSummary) -> Unit,
         onError: (String) -> Unit
     ): Pair<Query, ValueEventListener> {
 
@@ -194,7 +195,10 @@ class FirebaseRepository {
                     "Homes updated (live): ${homes.size}"
                 )
 
-                onHomes(homes)
+                onHomes(
+                    homes,
+                    buildDashboardSummary(snapshot)
+                )
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -212,6 +216,62 @@ class FirebaseRepository {
         query.addValueEventListener(listener)
 
         return query to listener
+    }
+
+
+    /*
+     * BUILD DASHBOARD SUMMARY
+     *
+     * Walks floors -> rooms -> devices across every home in this
+     * snapshot and totals them up. Each home node returned by the
+     * ownerId query above already carries its full nested subtree,
+     * so this is free — no extra Firebase read beyond the one the
+     * home list itself already needed.
+     */
+    private fun buildDashboardSummary(
+        homesSnapshot: DataSnapshot
+    ): DashboardSummary {
+
+        var floorsCount = 0
+        var roomsCount = 0
+        var devicesCount = 0
+        var devicesOn = 0
+
+        for (homeSnapshot in homesSnapshot.children) {
+
+            val floorsSnapshot = homeSnapshot.child("floors")
+
+            for (floorSnapshot in floorsSnapshot.children) {
+
+                floorsCount++
+
+                val roomsSnapshot = floorSnapshot.child("rooms")
+
+                for (roomSnapshot in roomsSnapshot.children) {
+
+                    roomsCount++
+
+                    for (deviceSnapshot in roomSnapshot.child("devices").children) {
+
+                        devicesCount++
+
+                        val isOn =
+                            deviceSnapshot.child("on").getValue(Boolean::class.java) ?: false
+
+                        if (isOn) {
+                            devicesOn++
+                        }
+                    }
+                }
+            }
+        }
+
+        return DashboardSummary(
+            floorsCount = floorsCount,
+            roomsCount = roomsCount,
+            devicesCount = devicesCount,
+            devicesOn = devicesOn
+        )
     }
 
 

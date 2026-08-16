@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -447,12 +448,41 @@ fun DeviceScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp)
+                    .padding(vertical = 6.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
 
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
+
+                    /*
+                     * Disabled while ERROR/DISCONNECTED — a device
+                     * that isn't reachable can't be toggled (as a
+                     * whole, or switch-by-switch) until it's
+                     * reconnected via the overflow menu. Declared
+                     * here (not inside the Row below) so it's also
+                     * visible to the per-switch controls further
+                     * down in the device-specific section.
+                     */
+                    val isControllable =
+                        device.status != "ERROR" &&
+                                device.status != "DISCONNECTED"
+
+                    /*
+                     * Multi-Switch devices don't have a directly
+                     * user-settable "on" of their own — it's derived
+                     * from whichever individual switches (below) are
+                     * on. So the top switch becomes a read-only "is
+                     * anything in this gang-box on?" indicator for
+                     * that type, and the real controls are the
+                     * per-switch rows in the device-specific section.
+                     */
+                    val isMultiSwitch =
+                        device.type == "MULTI_SWITCH"
+
 
                     /*
                      * DEVICE INFORMATION
@@ -489,10 +519,19 @@ fun DeviceScreen(
                             Text(
                                 text = "Status: ${device.status}",
                                 style = MaterialTheme.typography.bodyMedium,
+                                /*
+                                 * Status is never conveyed by color
+                                 * alone — this text label is always
+                                 * present too — but distinct colors
+                                 * per state (rather than just
+                                 * error/neutral) make the four-state
+                                 * model easier to scan at a glance.
+                                 */
                                 color = when (device.status) {
+                                    "ON" -> MaterialTheme.colorScheme.tertiary
                                     "ERROR" -> MaterialTheme.colorScheme.error
-                                    "DISCONNECTED" -> MaterialTheme.colorScheme.outline
-                                    else -> MaterialTheme.colorScheme.onSurface
+                                    "DISCONNECTED" -> MaterialTheme.colorScheme.secondary
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                                 }
                             )
                         }
@@ -500,15 +539,7 @@ fun DeviceScreen(
 
                         /*
                          * BASIC ON/OFF CONTROL
-                         *
-                         * Disabled while ERROR/DISCONNECTED — a device
-                         * that isn't reachable can't be toggled until
-                         * it's reconnected via the overflow menu.
                          */
-
-                        val isControllable =
-                            device.status != "ERROR" &&
-                                    device.status != "DISCONNECTED"
 
                         Switch(
                             checked = device.on,
@@ -521,7 +552,10 @@ fun DeviceScreen(
                                     device = device
                                 )
                             },
-                            enabled = !uiState.isLoading && isControllable
+                            enabled =
+                                !uiState.isLoading &&
+                                        isControllable &&
+                                        !isMultiSwitch
                         )
                     }
 
@@ -560,10 +594,57 @@ fun DeviceScreen(
 
                         "MULTI_SWITCH" -> {
 
+                            /*
+                             * INDIVIDUALLY ADDRESSABLE SWITCHES
+                             *
+                             * Each switch in this gang-box gets its own
+                             * row and its own Switch control — they're
+                             * separate addressable entities in Firebase
+                             * (device.switches), not just a count.
+                             */
+
                             Text(
-                                text = "Switches: ${device.switchCount}",
+                                text = "${device.switches.size} switch" +
+                                        if (device.switches.size == 1) "" else "es",
                                 style = MaterialTheme.typography.bodySmall
                             )
+
+                            Spacer(
+                                modifier = Modifier.height(4.dp)
+                            )
+
+                            device.switches.forEach { deviceSwitch ->
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+
+                                    Text(
+                                        text = deviceSwitch.name,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+
+                                    Switch(
+                                        checked = deviceSwitch.on,
+                                        onCheckedChange = {
+
+                                            deviceViewModel.toggleSwitch(
+                                                homeId = homeId,
+                                                floorId = floorId,
+                                                roomId = roomId,
+                                                device = device,
+                                                switchId = deviceSwitch.id
+                                            )
+                                        },
+                                        enabled =
+                                            !uiState.isLoading && isControllable
+                                    )
+                                }
+                            }
                         }
 
                         "CAMERA" -> {
@@ -1635,7 +1716,25 @@ fun DeviceScreen(
 
                                 switches = switches,
 
-                                maxOnDurationMinutes = maxOnDuration,
+                                /*
+                                 * Only fire-hazard appliances (IRON) get a
+                                 * max-on-duration safety cutoff — this must
+                                 * stay gated by type, otherwise every new
+                                 * device (lights, cameras, outlets, etc.)
+                                 * would inherit the "Maximum ON Duration"
+                                 * field's default value and SafetyMonitor
+                                 * would auto-turn them off after 15 minutes
+                                 * too, which isn't what the field is for.
+                                 */
+                                maxOnDurationMinutes =
+                                    if (
+                                        type ==
+                                        DeviceType.IRON
+                                    ) {
+                                        maxOnDuration
+                                    } else {
+                                        0
+                                    },
 
                                 scheduleEnabled =
                                     if (
@@ -2108,6 +2207,39 @@ fun DeviceScreen(
                 TextButton(
                     onClick = {
 
+                        /*
+                         * MULTI SWITCH
+                         *
+                         * Resize the actual switches list to match the
+                         * edited count (preserving existing switches'
+                         * on/off state by id), then re-derive the
+                         * device-level on/status from them — same
+                         * logic as toggleSwitch, so a resize that drops
+                         * a switch that was ON stays consistent with
+                         * the room-grid summary and reports, which read
+                         * the device-level "on" field directly.
+                         */
+
+                        val isMultiSwitchEdit =
+                            device.type == "MULTI_SWITCH"
+
+                        val resizedSwitches =
+                            if (isMultiSwitchEdit) {
+                                resizeSwitches(
+                                    existingSwitches = device.switches,
+                                    targetCount = editSwitchCount
+                                )
+                            } else {
+                                device.switches
+                            }
+
+                        val anySwitchOn =
+                            resizedSwitches.any { it.on }
+
+                        val isEditControllable =
+                            device.status != "ERROR" &&
+                                    device.status != "DISCONNECTED"
+
                         val updatedDevice = device.copy(
 
                             name =
@@ -2134,12 +2266,24 @@ fun DeviceScreen(
 
                             /*
                              * IRON
+                             *
+                             * Same type gate as device creation — this
+                             * also self-heals any device that was
+                             * previously created before this fix (which
+                             * incorrectly got a non-zero
+                             * maxOnDurationMinutes regardless of type):
+                             * saving an edit on a non-IRON device now
+                             * always resets it back to 0.
                              */
 
                             maxOnDurationMinutes =
-                                editMaxOnDuration
-                                    .toIntOrNull()
-                                    ?: 0,
+                                if (device.type == "IRON") {
+                                    editMaxOnDuration
+                                        .toIntOrNull()
+                                        ?: 0
+                                } else {
+                                    0
+                                },
 
                             /*
                              * MULTI SWITCH
@@ -2147,6 +2291,23 @@ fun DeviceScreen(
 
                             switchCount =
                                 editSwitchCount,
+
+                            switches =
+                                resizedSwitches,
+
+                            on =
+                                if (isMultiSwitchEdit) {
+                                    anySwitchOn
+                                } else {
+                                    device.on
+                                },
+
+                            status =
+                                if (isMultiSwitchEdit && isEditControllable) {
+                                    if (anySwitchOn) "ON" else "OFF"
+                                } else {
+                                    device.status
+                                },
 
                             /*
                              * CAMERA
@@ -2339,4 +2500,37 @@ fun parseTime(time: String): Pair<Int, Int> {
     val minute = parts[1].toIntOrNull() ?: 0
 
     return hour to minute
+}
+
+
+/*
+ * RESIZE SWITCHES
+ *
+ * Used when editing a Multi-Switch device's switch count. Keeps
+ * existing switches (same id -> same on/off state preserved) for
+ * indexes that still fall within the new count, and adds fresh
+ * (off) switches for any new indexes. Anything beyond the new
+ * count is simply dropped. Ids follow the same "switch$index"
+ * scheme used when a Multi-Switch device is first created, so
+ * this lines up with the existing switches by id correctly.
+ */
+fun resizeSwitches(
+    existingSwitches: List<DeviceSwitch>,
+    targetCount: Int
+): List<DeviceSwitch> {
+
+    val existingById =
+        existingSwitches.associateBy { it.id }
+
+    return (1..targetCount).map { index ->
+
+        val id = "switch$index"
+
+        existingById[id] ?: DeviceSwitch(
+            id = id,
+            name = "Switch $index",
+            on = false,
+            status = "OFF"
+        )
+    }
 }

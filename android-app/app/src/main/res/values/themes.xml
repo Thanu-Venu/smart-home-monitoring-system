@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.SmartHomeMonitoring" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+        Native (pre-Compose) theme — controls the status bar and
+        window background for the brief moment before Compose draws
+        its first frame, so app launch doesn't flash an unstyled
+        white/black screen before SmartHomeMonitoringTheme (in
+        ui/theme/Theme.kt) takes over.
+    -->
+    <style name="Theme.SmartHomeMonitoring" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/brand_primary</item>
+        <item name="android:windowBackground">@color/brand_background</item>
+    </style>
 </resources>
