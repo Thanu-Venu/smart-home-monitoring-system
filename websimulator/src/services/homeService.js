@@ -49,3 +49,27 @@ export const updateDeviceStatus = async (
     updates
   );
 };
+
+// Update an individual switch inside a multi-switch board
+export const updateMultiSwitch = async (
+  homeId,
+  floorId,
+  roomId,
+  deviceId,
+  switchId,
+  isOn
+) => {
+
+  const switchPath =
+    `homes/${homeId}/floors/${floorId}/rooms/${roomId}/devices/${deviceId}/switches/${switchId}`;
+
+  const updates = {
+    on: isOn,
+    status: isOn ? "ON" : "OFF",
+  };
+
+  await update(
+    ref(db, switchPath),
+    updates
+  );
+};

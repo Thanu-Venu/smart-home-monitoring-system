@@ -8,6 +8,7 @@ import { checkIronSafety } from "../services/ironSafetyService";
 import {
   listenToHomes,
   updateDeviceStatus,
+  updateMultiSwitch,
 } from "../services/homeService";
 
 const getDeviceCondition = (device) => {
@@ -225,6 +226,32 @@ function RoomDetails() {
 
     }
 
+  };
+  // Toggle individual switch in a multi-switch board
+  const toggleMultiSwitch = async (
+    deviceId,
+    switchId,
+    currentStatus
+  ) => {
+    if (!homeId || !floorId || !roomId) {
+      return;
+    }
+
+    try {
+      await updateMultiSwitch(
+        homeId,
+        floorId,
+        roomId,
+        deviceId,
+        switchId,
+        !currentStatus
+      );
+    } catch (error) {
+      console.error(
+        "Failed to update multi-switch:",
+        error
+      );
+    }
   };
 
 
@@ -479,6 +506,8 @@ function RoomDetails() {
                               ? "📷"
                               : device.type === "OUTLET"
                               ? "🔌"
+                              : device.type === "MULTI_SWITCH"
+                              ? "🔀"
                               : "🔌"}
 
                           </span>
@@ -519,6 +548,75 @@ function RoomDetails() {
                           <span>{condition.icon}</span>
                           <span>Condition: {condition.label}</span>
                         </div>
+                        
+
+                        {/* Multi-Switch Controls */}
+                        {device.type === "MULTI_SWITCH" && (
+                          <div className="multi-switch-container">
+
+                            <h4>Multi-Switch Board</h4>
+
+                            {Object.entries(device.switches || {}).map(
+                              ([switchId, switchData]) => {
+
+                                const switchIsOn =
+                                  switchData.on === true;
+
+                                return (
+                                  <div
+                                    className="multi-switch-row"
+                                    key={switchId}
+                                  >
+
+                                    <div className="multi-switch-info">
+
+                                      <span className="multi-switch-icon">
+                                        💡
+                                      </span>
+
+                                      <div>
+                                        <strong>
+                                          {switchData.name ||
+                                            `Switch ${switchId}`}
+                                        </strong>
+
+                                        <span
+                                          className={
+                                            switchIsOn
+                                              ? "multi-switch-status on"
+                                              : "multi-switch-status off"
+                                          }
+                                        >
+                                          {switchIsOn ? "ON" : "OFF"}
+                                        </span>
+                                      </div>
+
+                                    </div>
+
+                                    <button
+                                      className={
+                                        switchIsOn
+                                          ? "multi-switch-button off"
+                                          : "multi-switch-button on"
+                                      }
+                                      onClick={() =>
+                                        toggleMultiSwitch(
+                                          device.id,
+                                          switchId,
+                                          switchIsOn
+                                        )
+                                      }
+                                    >
+                                      {switchIsOn ? "TURN OFF" : "TURN ON"}
+                                    </button>
+
+                                  </div>
+                                );
+                              }
+                            )}
+
+                          </div>
+                        )}
 
                         {/* Schedule */}
 
@@ -540,27 +638,23 @@ function RoomDetails() {
 
 
                         {/* Device Control */}
-                        
-                        <button
-                          className={
-                            isOn
-                              ? "device-control off-button"
-                              : "device-control on-button"
-                          }
-
-                          onClick={() =>
-                            toggleDevice(
-                              device.id,
-                              isOn
-                            )
-                          }
-                        >
-
-                          {isOn
-                            ? "Turn OFF"
-                            : "Turn ON"}
-
-                        </button>
+                        {device.type !== "MULTI_SWITCH" && (
+                          <button 
+                            className={ 
+                              isOn 
+                                ? "device-control off-button" 
+                                : "device-control on-button" 
+                            } 
+                            onClick={() => 
+                              toggleDevice( 
+                                device.id, 
+                                isOn 
+                              ) 
+                            } 
+                          > 
+                            {isOn ? "Turn OFF" : "Turn ON"} 
+                          </button>
+                        )}
                         {device.type === "CAMERA" && isOn && (
                           <button
                             className="view-camera-button"
