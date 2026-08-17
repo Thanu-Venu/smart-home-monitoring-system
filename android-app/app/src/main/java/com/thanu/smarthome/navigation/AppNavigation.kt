@@ -12,6 +12,8 @@ import com.thanu.smarthome.ui.LoginScreen
 import com.thanu.smarthome.ui.ReportsScreen
 import com.thanu.smarthome.ui.RoomScreen
 import com.thanu.smarthome.ui.SignUpScreen
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 @Composable
 fun AppNavigation() {
@@ -223,12 +225,23 @@ fun AppNavigation() {
                             selectedRoomId,
                             selectedRoomName ->
 
+                        /*
+                         * URL-encode the room name before it becomes a
+                         * route segment. Room names can be freely typed
+                         * (the "Custom" room-name option), so a name
+                         * containing "/" would otherwise be split into
+                         * extra path segments and break this route's
+                         * argument parsing.
+                         */
+                        val encodedRoomName =
+                            URLEncoder.encode(selectedRoomName, "UTF-8")
+
                         navController.navigate(
                             "devices/" +
                                     "$selectedHomeId/" +
                                     "$selectedFloorId/" +
                                     "$selectedRoomId/" +
-                                    selectedRoomName
+                                    encodedRoomName
                         )
                     },
 
@@ -266,6 +279,7 @@ fun AppNavigation() {
             val roomName =
                 backStackEntry.arguments
                     ?.getString("roomName")
+                    ?.let { URLDecoder.decode(it, "UTF-8") }
 
             if (
                 homeId != null &&
