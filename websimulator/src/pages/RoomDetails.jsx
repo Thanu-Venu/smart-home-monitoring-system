@@ -932,7 +932,7 @@ function RoomDetails() {
             <div className="camera-video-container">
 
               <video
-                src={selectedCamera.url}
+                src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"
                 autoPlay
                 controls
                 muted
